@@ -261,7 +261,6 @@ class Response(threading.local):
 
 
 # Routing
-
 def compile_route(route):
     """ Compiles a route string and returns a precompiled RegexObject.
 
