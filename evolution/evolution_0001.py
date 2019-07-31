@@ -305,7 +305,9 @@ def match_url(url, method='GET'):
             return handler, match.groupdict()
     raise HTTPError(404, "Not found")
 
-
+# add_route('/', handler)
+# add_route('/hello/:name', handler)
+# add_route('/hello', handler, method='POST')
 def add_route(route, handler, method='GET', simple=False):
     """ Adds a new route to the route mappings.
 
@@ -320,11 +322,18 @@ def add_route(route, handler, method='GET', simple=False):
         route = compile_route(route)
         ROUTES_REGEXP.setdefault(method, []).append([route, handler])
 
-
+"""
+@route('/')
+@route('/hello/:name')
+@route('/hello', method='POST')
+"""
 def route(url, **kargs):
     """ Decorator for request handler. Same as add_route(url, handler)."""
 
     def wrapper(handler):
+        # add_route('/', handler)
+        # add_route('/hello/:name', handler)
+        # add_route('/hello', handler, method='POST')
         add_route(url, handler, **kargs)
         return handler
 
