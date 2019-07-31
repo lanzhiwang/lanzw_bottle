@@ -315,11 +315,17 @@ def add_route(route, handler, method='GET', simple=False):
           return "Hello world!"
         add_route(r'/hello', hello)"""
     method = method.strip().upper()
+    print '增加路由 path：{} method: {}'.format(route, method)
+    print re.match(r'^/(\w+/)*\w*$', route)
     if re.match(r'^/(\w+/)*\w*$', route) or simple:
         ROUTES_SIMPLE.setdefault(method, {})[route] = handler
+        print ROUTES_SIMPLE
     else:
         route = compile_route(route)
         ROUTES_REGEXP.setdefault(method, []).append([route, handler])
+        print ROUTES_REGEXP
+
+    print '全局路由变量 ROUTES_SIMPLE: {} ROUTES_REGEXP: {}'.format(ROUTES_SIMPLE, ROUTES_REGEXP)
 
 """
 @route('/')
@@ -363,11 +369,16 @@ def WSGIHandler(environ, start_response):
     """The bottle WSGI-handler."""
     global request
     global response
+    print '\n\n 开始处理请求'
+    # print 'environ: {}'.format(environ)
     request.bind(environ)
     response.bind()
     try:
+        print 'request.path: {} request.method: {}'.format(request.path, request.method)
         handler, args = match_url(request.path, request.method)
+        print 'handler: {} args: {}'.format(handler, args)  # handler: <function say at 0x2189ed8> args: {'name': 'huzhi'}
         output = handler(**args)
+        print 'output: {}'.format(output)  # output: Hello huzhi!
     except BreakTheBottle, shard:
         output = shard.output
     except Exception, exception:
@@ -420,6 +431,7 @@ class ServerAdapter(object):
 
 
 class WSGIRefServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from wsgiref.simple_server import make_server
         srv = make_server(self.host, self.port, handler)
@@ -427,6 +439,7 @@ class WSGIRefServer(ServerAdapter):
 
 
 class CherryPyServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from cherrypy import wsgiserver
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
@@ -434,17 +447,21 @@ class CherryPyServer(ServerAdapter):
 
 
 class FlupServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from flup.server.fcgi import WSGIServer
         WSGIServer(handler, bindAddress=(self.host, self.port)).run()
 
 
 class PasteServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from paste import httpserver
         httpserver.serve(handler, host=self.host, port=str(self.port))
 
 
+# run(host='localhost', port=8080)
+# run(host='localhost', port=8080, quiet=True)
 def run(server=WSGIRefServer, host='127.0.0.1', port=8080, **kargs):
     """ Runs bottle as a web server, using Python's built-in wsgiref implementation by default.
 
@@ -453,6 +470,7 @@ def run(server=WSGIRefServer, host='127.0.0.1', port=8080, **kargs):
     """
 
     quiet = bool('quiet' in kargs and kargs['quiet'])
+    print 'quiet: {}'.format(quiet)
 
     # Instanciate server, if it is a class instead of an instance
     if isinstance(server, type) and issubclass(server, ServerAdapter):
@@ -539,7 +557,7 @@ def error404(exception):
 request = Request()
 response = Response()
 
-if __name__ == __main__:
+if __name__ == "__main__":
 
     @route('/')
     def index():
@@ -554,4 +572,69 @@ if __name__ == __main__:
         name = request.POST['name']
         return 'Hello %s!' % name
 
-    run(host='localhost', port=8080)
+    print "\n\n"
+    print "启动内置服务器"
+    # run(host='localhost', port=8080)
+    run(host='0.0.0.0', port=8080, quiet=True)
+
+    """
+    开始处理请求
+    10.0.1.1 - - [31/Jul/2019 18:54:56] "GET /hello/huzhi HTTP/1.1" 200 12
+
+    开始处理请求
+    10.0.1.1 - - [31/Jul/2019 18:55:06] "GET /favicon.ico HTTP/1.1" 404 220
+    
+    environ: {
+    'SERVER_SOFTWARE': 'WSGIServer/0.1 Python/2.7.5', 
+    'SCRIPT_NAME': '', 
+    'REQUEST_METHOD': 'GET', 
+    'SERVER_PROTOCOL': 'HTTP/1.1', 
+    'HOME': '/root', 
+    'LANG': 'en_US.UTF-8', 
+    'SHELL': '/bin/bash', 
+    'HISTSIZE': '1000', 
+    'SERVER_PORT': '8080', 
+    'XDG_RUNTIME_DIR': '/run/user/0', 
+    'HTTP_HOST': '10.0.8.10:8080', 
+    'HTTP_UPGRADE_INSECURE_REQUESTS': '1', 
+    'HTTP_CACHE_CONTROL': 'max-age=0', 
+    'XDG_SESSION_ID': '3', 
+    'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3', 
+    'wsgi.version': (1, 0), 
+    'wsgi.run_once': False, 
+    'SSH_TTY': '/dev/pts/0', 
+    'wsgi.errors': <open file '<stderr>', mode 'w' at 0x7f58125951e0>, 
+    'HOSTNAME': 'huzhi-code', 
+    'HTTP_ACCEPT_LANGUAGE': 'zh-CN,zh;q=0.9', 
+    'MAIL': '/var/spool/mail/root', 
+    'LS_COLORS': '45:*.xspf=38;5;45:', 
+    'PATH_INFO': '/hello/huzhi', 
+    'wsgi.multiprocess': False, 
+    'LESSOPEN': '||/usr/bin/lesspipe.sh %s', 
+    'SSH_CLIENT': '10.0.1.1 65248 22', 
+    'LOGNAME': 'root', 
+    'USER': 'root', 
+    'QUERY_STRING': '', 
+    'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin', 
+    'TERM': 'xterm-256color', 
+    'HTTP_USER_AGENT': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36', 
+    'HTTP_CONNECTION': 'keep-alive', 
+    'SERVER_NAME': 'huzhi-code', 
+    'REMOTE_ADDR': '10.0.1.1', 
+    'SHLVL': '1', 
+    'wsgi.url_scheme': 'http', 
+    'CONTENT_LENGTH': '', 
+    'wsgi.input': <socket._fileobject object at 0x1fed0d0>, 
+    'wsgi.multithread': True, 
+    '_': '/usr/bin/python', 
+    'SSH_CONNECTION': '10.0.1.1 65248 10.0.8.10 22', 
+    'GATEWAY_INTERFACE': 'CGI/1.1', 
+    'OLDPWD': '/root/work/lanzw_frame', 
+    'HISTCONTROL': 'ignoredups', 
+    'PWD': '/root/work/lanzw_frame/evolution', 
+    'CONTENT_TYPE': 'text/plain', 
+    'wsgi.file_wrapper': <class wsgiref.util.FileWrapper at 0x204bce8>, 
+    'REMOTE_HOST': 'gateway', 
+    'HTTP_ACCEPT_ENCODING': 'gzip, deflate'
+    }
+    """
