@@ -1,4 +1,15 @@
+# -*- coding: utf-8 -*-
+
 """
+第一版
+实现基本框架基本结构
+
+具体实现：
+http status code
+Request
+Response
+route
+wsgi server
 """
 
 __author__ = 'lanzhiwang'
