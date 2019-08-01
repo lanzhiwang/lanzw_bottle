@@ -127,15 +127,12 @@ class HeaderDict(dict):
     You may add a list of strings to send multible headers with the same name.'''
 
     def __setitem__(self, key, value):
-        print '__setitem__ key:{} value: {}'.format(key, value)
         return dict.__setitem__(self, key.title(), value)
 
     def __getitem__(self, key):
-        print '__getitem__ key:{}'.format(key)
         return dict.__getitem__(self, key.title())
 
     def __delitem__(self, key):
-        print '__delitem__ key:{}'.format(key)
         return dict.__delitem__(self, key.title())
 
     def __contains__(self, key):
