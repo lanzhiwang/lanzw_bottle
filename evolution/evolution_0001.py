@@ -33,7 +33,7 @@ DEBUG = False
 OPTIMIZER = True
 ROUTES_SIMPLE = {}
 ROUTES_REGEXP = {}
-ERROR_HANDLER = {}
+ERROR_HANDLER = {}  # ERROR_HANDLER[code] = handler
 HTTP_CODES = {
     100: 'CONTINUE',
     101: 'SWITCHING PROTOCOLS',
@@ -109,18 +109,33 @@ class BreakTheBottle(BottleException):
 
 # Classes
 
+"""
+class Response
+
+self.header = HeaderDict()
+self.header['Content-Type'] = value
+return self.header['Content-Type']
+
+response.header['Content-Length'] = len(output)
+response.header.add('Set-Cookie', c.OutputString())
+response.header.items()
+response.header['Location'] = url
+"""
 class HeaderDict(dict):
     ''' A dictionary with case insensitive (titled) keys.
 
     You may add a list of strings to send multible headers with the same name.'''
 
     def __setitem__(self, key, value):
+        print '__setitem__ key:{} value: {}'.format(key, value)
         return dict.__setitem__(self, key.title(), value)
 
     def __getitem__(self, key):
+        print '__getitem__ key:{}'.format(key)
         return dict.__getitem__(self, key.title())
 
     def __delitem__(self, key):
+        print '__delitem__ key:{}'.format(key)
         return dict.__delitem__(self, key.title())
 
     def __contains__(self, key):
@@ -129,7 +144,7 @@ class HeaderDict(dict):
     def items(self):
         """ Returns a list of (key, value) tuples """
         for key, values in dict.items(self):
-            if not isinstance(values, list):
+            if not isinstance(values, list):  # 全部转为 list
                 values = [values]
             for value in values:
                 yield (key, str(value))
@@ -147,8 +162,39 @@ class HeaderDict(dict):
         else:
             self[key] = [value]
 
+"""
+    hd = HeaderDict()
+    hd['Content-Type'] = 'text/html'
+    hd['qwe'] = 'qwe'
+    hd['qwe'] = 'asd'
+    hd['rty'] = ['fgh', 'vbn']
+    print hd
+    
+    {
+    'Rty': ['fgh', 'vbn'], 
+    'Qwe': 'asd', 
+    'Content-Type': 'text/html'
+    }
+    
 
-class Request(threading.local):
+    hd.add('addkey1', ['123', '456'])
+    hd.add('qwe', ['123', '456'])
+    print hd
+    
+    {
+    'Rty': ['fgh', 'vbn'], 
+    'Qwe': ['asd', '123', '456'], 
+    'Addkey1': ['123', '456'], 
+    'Content-Type': 'text/html'
+    }
+    
+"""
+
+
+
+# 暂时不需要继承 threading.local
+# class Request(threading.local):
+class Request():
     """ Represents a single request using thread-local namespace. """
 
     def bind(self, environ):
@@ -184,7 +230,7 @@ class Request(threading.local):
     def GET(self):
         """Returns a dict with GET parameters."""
         if self._GET is None:
-            raw_dict = parse_qs(self.query, keep_blank_values=1)
+            raw_dict = parse_qs(self.query, keep_blank_values=1)  # 好像有bug，不应该是 self.query，应该是 self.query_string
             self._GET = {}
             for key, value in raw_dict.items():
                 if len(value) == 1:
@@ -226,7 +272,9 @@ class Request(threading.local):
         return self._COOKIES
 
 
-class Response(threading.local):
+# 暂时不需要继承 threading.local
+# class Response(threading.local):
+class Response():
     """ Represents a single response using thread-local namespace. """
 
     def bind(self):
@@ -371,6 +419,8 @@ def WSGIHandler(environ, start_response):
     global response
     print '\n\n 开始处理请求'
     # print 'environ: {}'.format(environ)
+    print 'request: {}'.format(id(request))
+    print 'response: {}'.format(id(response))
     request.bind(environ)
     response.bind()
     try:
@@ -576,6 +626,9 @@ if __name__ == "__main__":
     print "启动内置服务器"
     # run(host='localhost', port=8080)
     run(host='0.0.0.0', port=8080, quiet=True)
+    # run(server=CherryPyServer, host='0.0.0.0', port=8080, quiet=False)
+    # run(server=PasteServer, host='0.0.0.0', port=8080, quiet=False)
+    # run(server=FlupServer, host='0.0.0.0', port=8080, quiet=False)
 
     """
     开始处理请求
