@@ -223,7 +223,7 @@ class Request():
         return self._POST
 
     @property
-    def params(self):
+    def params(self):  # 返回值有 bug
         ''' Returns a mix of GET and POST data. POST overwrites GET '''
         if self._GETPOST is None:
             self._GETPOST = dict(self.GET)
