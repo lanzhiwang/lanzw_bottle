@@ -198,7 +198,7 @@ class Request():
     def GET(self):
         """Returns a dict with GET parameters."""
         if self._GET is None:
-            raw_dict = parse_qs(self.query, keep_blank_values=1)  # 好像有bug，不应该是 self.query，应该是 self.query_string
+            raw_dict = parse_qs(self.query_string, keep_blank_values=1)  # 好像有bug，不应该是 self.query，应该是 self.query_string
             self._GET = {}
             for key, value in raw_dict.items():
                 if len(value) == 1:
