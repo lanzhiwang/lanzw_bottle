@@ -423,6 +423,8 @@ def WSGIHandler(environ, start_response):
     open(filename, 'r')
     yield
     """
+
+    """
     if hasattr(output, 'read'):
         if 'wsgi.file_wrapper' in environ:
             output = environ['wsgi.file_wrapper'](output)
@@ -431,6 +433,23 @@ def WSGIHandler(environ, start_response):
 
     if hasattr(output, '__len__') and 'Content-Length' not in response.header:
         response.header['Content-Length'] = len(output)
+    """
+
+    """
+    这样计算出来的的长度更准确
+    判断 Content-Length 是否存在可以防止覆盖框架使用者设置的 Content-Length 头信息
+    有时框架使用者会自己设置 Content-Length 信息，此时不能覆盖
+    """
+    if hasattr(output, 'fileno') and 'Content-Length' not in response.header:
+        size = os.fstat(output.fileno()).st_size
+        response.header['Content-Length'] = size
+
+    if hasattr(output, 'read'):
+        fileoutput = output
+        if 'wsgi.file_wrapper' in environ:
+            output = environ['wsgi.file_wrapper'](fileoutput)
+        else:
+            output = iter(lambda: fileoutput.read(8192), '')
 
     for c in response.COOKIES.values():
         response.header.add('Set-Cookie', c.OutputString())
