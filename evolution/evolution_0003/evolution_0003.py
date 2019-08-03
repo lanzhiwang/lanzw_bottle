@@ -1,59 +1,19 @@
-"""
-bottle.py is a one-file micro web framework.
-Inspired by itty.py (Daniel Lindsley)
-
-Licence (MIT)
--------------
-
-    Copyright (c) 2009, Marcel Hellkamp.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    THE SOFTWARE.
-
-
-Example
--------
-
-    from bottle import route, run, request, response, send_file, abort
-
-    @route('/')
-    def hello_world():
-        return 'Hello World!'
-
-    @route('/hello/:name')
-    def hello_name(name):
-        return 'Hello %s!' % name
-
-    @route('/hello', method='POST')
-    def hello_post():
-        name = request.POST['name']
-        return 'Hello %s!' % name
-
-    @route('/static/:filename#.*#')
-    def static_file(filename):
-        send_file(filename, root='/path/to/static/files/')
-
-    run(host='localhost', port=8080)
+# -*- coding: utf-8 -*-
 
 """
+第一版
+实现基本框架基本结构
 
-__author__ = 'Marcel Hellkamp'
-__version__ = ('0', '3', '2')
+具体实现：
+http status code
+Request
+Response
+route
+wsgi server
+"""
+
+__author__ = 'lanzhiwang'
+__version__ = ('0', '0', '0')
 __license__ = 'MIT'
 
 import cgi
@@ -73,7 +33,7 @@ DEBUG = False
 OPTIMIZER = True
 ROUTES_SIMPLE = {}
 ROUTES_REGEXP = {}
-ERROR_HANDLER = {}
+ERROR_HANDLER = {}  # ERROR_HANDLER[code] = handler
 HTTP_CODES = {
     100: 'CONTINUE',
     101: 'SWITCHING PROTOCOLS',
@@ -149,6 +109,18 @@ class BreakTheBottle(BottleException):
 
 # Classes
 
+"""
+class Response
+
+self.header = HeaderDict()
+self.header['Content-Type'] = value
+return self.header['Content-Type']
+
+response.header['Content-Length'] = len(output)
+response.header.add('Set-Cookie', c.OutputString())
+response.header.items()
+response.header['Location'] = url
+"""
 class HeaderDict(dict):
     ''' A dictionary with case insensitive (titled) keys.
 
@@ -169,7 +141,7 @@ class HeaderDict(dict):
     def items(self):
         """ Returns a list of (key, value) tuples """
         for key, values in dict.items(self):
-            if not isinstance(values, list):
+            if not isinstance(values, list):  # 全部转为 list
                 values = [values]
             for value in values:
                 yield (key, str(value))
@@ -188,7 +160,9 @@ class HeaderDict(dict):
             self[key] = [value]
 
 
-class Request(threading.local):
+# 暂时不需要继承 threading.local
+# class Request(threading.local):
+class Request():
     """ Represents a single request using thread-local namespace. """
 
     def bind(self, environ):
@@ -224,7 +198,7 @@ class Request(threading.local):
     def GET(self):
         """Returns a dict with GET parameters."""
         if self._GET is None:
-            raw_dict = parse_qs(self.query_string, keep_blank_values=1)
+            raw_dict = parse_qs(self.query_string, keep_blank_values=1)  # 好像有bug，不应该是 self.query，应该是 self.query_string
             self._GET = {}
             for key, value in raw_dict.items():
                 if len(value) == 1:
@@ -249,7 +223,7 @@ class Request(threading.local):
         return self._POST
 
     @property
-    def params(self):
+    def params(self):  # 返回值有 bug
         ''' Returns a mix of GET and POST data. POST overwrites GET '''
         if self._GETPOST is None:
             self._GETPOST = dict(self.GET)
@@ -266,7 +240,9 @@ class Request(threading.local):
         return self._COOKIES
 
 
-class Response(threading.local):
+# 暂时不需要继承 threading.local
+# class Response(threading.local):
+class Response():
     """ Represents a single response using thread-local namespace. """
 
     def bind(self):
@@ -301,7 +277,6 @@ class Response(threading.local):
 
 
 # Routing
-
 def compile_route(route):
     """ Compiles a route string and returns a precompiled RegexObject.
 
@@ -345,7 +320,9 @@ def match_url(url, method='GET'):
             return handler, match.groupdict()
     raise HTTPError(404, "Not found")
 
-
+# add_route('/', handler)
+# add_route('/hello/:name', handler)
+# add_route('/hello', handler, method='POST')
 def add_route(route, handler, method='GET', simple=False):
     """ Adds a new route to the route mappings.
 
@@ -354,17 +331,30 @@ def add_route(route, handler, method='GET', simple=False):
           return "Hello world!"
         add_route(r'/hello', hello)"""
     method = method.strip().upper()
+    print '增加路由 path：{} method: {}'.format(route, method)
+    print re.match(r'^/(\w+/)*\w*$', route)
     if re.match(r'^/(\w+/)*\w*$', route) or simple:
         ROUTES_SIMPLE.setdefault(method, {})[route] = handler
+        print ROUTES_SIMPLE
     else:
         route = compile_route(route)
         ROUTES_REGEXP.setdefault(method, []).append([route, handler])
+        print ROUTES_REGEXP
 
+    print '全局路由变量 ROUTES_SIMPLE: {} ROUTES_REGEXP: {}'.format(ROUTES_SIMPLE, ROUTES_REGEXP)
 
+"""
+@route('/')
+@route('/hello/:name')
+@route('/hello', method='POST')
+"""
 def route(url, **kargs):
     """ Decorator for request handler. Same as add_route(url, handler)."""
 
     def wrapper(handler):
+        # add_route('/', handler)
+        # add_route('/hello/:name', handler)
+        # add_route('/hello', handler, method='POST')
         add_route(url, handler, **kargs)
         return handler
 
@@ -395,14 +385,21 @@ def WSGIHandler(environ, start_response):
     """The bottle WSGI-handler."""
     global request
     global response
+    print '\n\n 开始处理请求'
+    # print 'environ: {}'.format(environ)
+    print 'request: {}'.format(id(request))
+    print 'response: {}'.format(id(response))
     request.bind(environ)
     response.bind()
     try:
+        print 'request.path: {} request.method: {}'.format(request.path, request.method)
         handler, args = match_url(request.path, request.method)
+        print 'handler: {} args: {}'.format(handler, args)  # handler: <function say at 0x2189ed8> args: {'name': 'huzhi'}
         output = handler(**args)
-    except BreakTheBottle, shard:
+        print 'output: {}'.format(output)  # output: Hello huzhi!
+    except BreakTheBottle, shard:  # BreakTheBottle(open(filename, 'r'))
         output = shard.output
-    except Exception, exception:
+    except Exception, exception:  # 主要是 HTTPError 异常
         response.status = getattr(exception, 'http_status', 500)
         errorhandler = ERROR_HANDLER.get(response.status, None)
         if errorhandler:
@@ -416,9 +413,18 @@ def WSGIHandler(environ, start_response):
             else:
                 output = "Unhandled exception: Application stopped."
 
+        # 服务器内部错误处理办法
         if response.status == 500:
             request._environ['wsgi.errors'].write("Error (500) on '%s': %s\n" % (request.path, exception))
 
+    """
+    到此为止 output 主要有以下三种类型：
+    strings
+    open(filename, 'r')
+    yield
+    """
+
+    """
     if hasattr(output, 'read'):
         if 'wsgi.file_wrapper' in environ:
             output = environ['wsgi.file_wrapper'](output)
@@ -427,6 +433,23 @@ def WSGIHandler(environ, start_response):
 
     if hasattr(output, '__len__') and 'Content-Length' not in response.header:
         response.header['Content-Length'] = len(output)
+    """
+
+    """
+    这样计算出来的的长度更准确
+    判断 Content-Length 是否存在可以防止覆盖框架使用者设置的 Content-Length 头信息
+    有时框架使用者会自己设置 Content-Length 信息，此时不能覆盖
+    """
+    if hasattr(output, 'fileno') and 'Content-Length' not in response.header:
+        size = os.fstat(output.fileno()).st_size
+        response.header['Content-Length'] = size
+
+    if hasattr(output, 'read'):
+        fileoutput = output
+        if 'wsgi.file_wrapper' in environ:
+            output = environ['wsgi.file_wrapper'](fileoutput)
+        else:
+            output = iter(lambda: fileoutput.read(8192), '')
 
     for c in response.COOKIES.values():
         response.header.add('Set-Cookie', c.OutputString())
@@ -452,6 +475,7 @@ class ServerAdapter(object):
 
 
 class WSGIRefServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from wsgiref.simple_server import make_server
         srv = make_server(self.host, self.port, handler)
@@ -459,6 +483,7 @@ class WSGIRefServer(ServerAdapter):
 
 
 class CherryPyServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from cherrypy import wsgiserver
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
@@ -466,17 +491,25 @@ class CherryPyServer(ServerAdapter):
 
 
 class FlupServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from flup.server.fcgi import WSGIServer
         WSGIServer(handler, bindAddress=(self.host, self.port)).run()
 
 
 class PasteServer(ServerAdapter):
+    # server.run(WSGIHandler)
     def run(self, handler):
         from paste import httpserver
-        httpserver.serve(handler, host=self.host, port=str(self.port))
+        # httpserver.serve(handler, host=self.host, port=str(self.port))
+        # Added access logging for PasterServer
+        from paste.translogger import TransLogger
+        app = TransLogger(handler)
+        httpserver.serve(app, host=self.host, port=str(self.port))
 
 
+# run(host='localhost', port=8080)
+# run(host='localhost', port=8080, quiet=True)
 def run(server=WSGIRefServer, host='127.0.0.1', port=8080, **kargs):
     """ Runs bottle as a web server, using Python's built-in wsgiref implementation by default.
 
@@ -485,6 +518,7 @@ def run(server=WSGIRefServer, host='127.0.0.1', port=8080, **kargs):
     """
 
     quiet = bool('quiet' in kargs and kargs['quiet'])
+    print 'quiet: {}'.format(quiet)
 
     # Instanciate server, if it is a class instead of an instance
     if isinstance(server, type) and issubclass(server, ServerAdapter):
@@ -570,3 +604,88 @@ def error404(exception):
 
 request = Request()
 response = Response()
+
+if __name__ == "__main__":
+
+    @route('/')
+    def index():
+        return 'Hello World!'
+
+    @route('/hello/:name')
+    def say(name):
+        return 'Hello %s!' % name
+
+    @route('/hello', method='POST')
+    def say():
+        name = request.POST['name']
+        return 'Hello %s!' % name
+
+    print "\n\n"
+    print "启动内置服务器"
+    # run(host='localhost', port=8080)
+    run(host='0.0.0.0', port=8080, quiet=True)
+    # run(server=CherryPyServer, host='0.0.0.0', port=8080, quiet=False)
+    # run(server=PasteServer, host='0.0.0.0', port=8080, quiet=False)
+    # run(server=FlupServer, host='0.0.0.0', port=8080, quiet=False)
+
+    """
+    开始处理请求
+    10.0.1.1 - - [31/Jul/2019 18:54:56] "GET /hello/huzhi HTTP/1.1" 200 12
+
+    开始处理请求
+    10.0.1.1 - - [31/Jul/2019 18:55:06] "GET /favicon.ico HTTP/1.1" 404 220
+    
+    environ: {
+    'SERVER_SOFTWARE': 'WSGIServer/0.1 Python/2.7.5', 
+    'SCRIPT_NAME': '', 
+    'REQUEST_METHOD': 'GET', 
+    'SERVER_PROTOCOL': 'HTTP/1.1', 
+    'HOME': '/root', 
+    'LANG': 'en_US.UTF-8', 
+    'SHELL': '/bin/bash', 
+    'HISTSIZE': '1000', 
+    'SERVER_PORT': '8080', 
+    'XDG_RUNTIME_DIR': '/run/user/0', 
+    'HTTP_HOST': '10.0.8.10:8080', 
+    'HTTP_UPGRADE_INSECURE_REQUESTS': '1', 
+    'HTTP_CACHE_CONTROL': 'max-age=0', 
+    'XDG_SESSION_ID': '3', 
+    'HTTP_ACCEPT': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3', 
+    'wsgi.version': (1, 0), 
+    'wsgi.run_once': False, 
+    'SSH_TTY': '/dev/pts/0', 
+    'wsgi.errors': <open file '<stderr>', mode 'w' at 0x7f58125951e0>, 
+    'HOSTNAME': 'huzhi-code', 
+    'HTTP_ACCEPT_LANGUAGE': 'zh-CN,zh;q=0.9', 
+    'MAIL': '/var/spool/mail/root', 
+    'LS_COLORS': '45:*.xspf=38;5;45:', 
+    'PATH_INFO': '/hello/huzhi', 
+    'wsgi.multiprocess': False, 
+    'LESSOPEN': '||/usr/bin/lesspipe.sh %s', 
+    'SSH_CLIENT': '10.0.1.1 65248 22', 
+    'LOGNAME': 'root', 
+    'USER': 'root', 
+    'QUERY_STRING': '', 
+    'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin', 
+    'TERM': 'xterm-256color', 
+    'HTTP_USER_AGENT': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36', 
+    'HTTP_CONNECTION': 'keep-alive', 
+    'SERVER_NAME': 'huzhi-code', 
+    'REMOTE_ADDR': '10.0.1.1', 
+    'SHLVL': '1', 
+    'wsgi.url_scheme': 'http', 
+    'CONTENT_LENGTH': '', 
+    'wsgi.input': <socket._fileobject object at 0x1fed0d0>, 
+    'wsgi.multithread': True, 
+    '_': '/usr/bin/python', 
+    'SSH_CONNECTION': '10.0.1.1 65248 10.0.8.10 22', 
+    'GATEWAY_INTERFACE': 'CGI/1.1', 
+    'OLDPWD': '/root/work/lanzw_frame', 
+    'HISTCONTROL': 'ignoredups', 
+    'PWD': '/root/work/lanzw_frame/evolution', 
+    'CONTENT_TYPE': 'text/plain', 
+    'wsgi.file_wrapper': <class wsgiref.util.FileWrapper at 0x204bce8>, 
+    'REMOTE_HOST': 'gateway', 
+    'HTTP_ACCEPT_ENCODING': 'gzip, deflate'
+    }
+    """
