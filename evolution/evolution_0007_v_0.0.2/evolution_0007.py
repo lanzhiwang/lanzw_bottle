@@ -238,10 +238,7 @@ class Response(threading.local):
     @property
     def COOKIES(self):
         if not self._COOKIES:
-            print 'Response COOKIES not exits'
             self._COOKIES = Cookie.SimpleCookie()
-        print 'Response COOKIES: {}'.format(self._COOKIES)
-        print 'Response type(self._COOKIES): {}'.format(type(self._COOKIES))
         return self._COOKIES
 
     def set_cookie(self, key, value, **kargs):
@@ -387,6 +384,8 @@ def WSGIHandler(environ, start_response):
         else:
             output = iter(lambda: fileoutput.read(8192), '')
 
+    # 这里始终会调用 Response 中的 COOKIES 属性
+    # 所以每次请求都会调用 Response 中的 COOKIES 属性
     for c in response.COOKIES.values():
         print '响应头信息设置 cookies'
         response.header.add('Set-Cookie', c.OutputString())
