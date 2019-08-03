@@ -19,6 +19,7 @@ __license__ = 'MIT'
 import cgi
 import mimetypes
 import os
+import sys
 import re
 import random
 import Cookie
@@ -215,8 +216,10 @@ class Request():
     def POST(self):
         """Returns a dict with parsed POST data."""
         if self._POST is None:
+            # 'wsgi.input': <socket._fileobject object at 0x1991050>,
             raw_data = cgi.FieldStorage(fp=self._environ['wsgi.input'], environ=self._environ)
-            print 'raw_data: {}'.format(raw_data)   # raw_data: FieldStorage(None, None, [FieldStorage('name', None, 'user')])
+            print 'raw_data: {}'.format(raw_data)
+            print type(raw_data)
             self._POST = {}
 
             """
@@ -229,6 +232,8 @@ class Request():
                 for key, value in raw_data:
             ValueError: too many values to unpack
             """
+
+            """
             for key, value in raw_data:
                 if value.filename:
                     self._POST[key] = value
@@ -236,6 +241,125 @@ class Request():
                     self._POST[key] = [v.value for v in value]
                 else:
                     self._POST[key] = value.value
+            """
+
+            for key in raw_data:
+                print 'key: {}'.format(key)
+                print raw_data[key]  # FieldStorage('name', None, 'user')
+                print type(raw_data[key])  # <type 'instance'>
+                if raw_data[key].filename:
+                    print 'filename: {}'.format(raw_data[key].filename)
+                    self._POST[key] = raw_data[key]
+                elif isinstance(raw_data[key], list):
+                    print 'list: {}'.format(raw_data[key])
+                    self._POST[key] = [v.value for v in raw_data[key]]
+                else:
+                    print 'raw_data[key].value'
+                    self._POST[key] = raw_data[key].value
+        """
+        curl -F "name=user" -F "password=test" http://localhost:8080/hello
+        raw_data: FieldStorage(None, None, [FieldStorage('name', None, 'user'), FieldStorage('password', None, 'test')])
+        <type 'instance'>
+        key: password
+        FieldStorage('password', None, 'test')
+        <type 'instance'>
+        raw_data[key].value
+        key: name
+        FieldStorage('name', None, 'user')
+        <type 'instance'>
+        raw_data[key].value
+        
+        curl -X POST -d "name=comewords&content=articleContent" http://localhost:8080/hello 
+        raw_data: FieldStorage(None, None, [MiniFieldStorage('name', 'comewords'), MiniFieldStorage('content', 'articleContent')])
+        <type 'instance'>
+        key: content
+        MiniFieldStorage('content', 'articleContent')
+        <type 'instance'>
+        raw_data[key].value
+        key: name
+        MiniFieldStorage('name', 'comewords')
+        <type 'instance'>
+        raw_data[key].value
+        
+        现在暂时不能同时上传文件和post参数
+        curl -X POST -F "file=@/root/work/lanzw_frame/evolution/evolution_0001/static/ling.png" -d "name=comewords" http://localhost:8080/hello
+        Warning: You can only select one HTTP request!
+        
+        curl -X POST -F "file=@/root/work/lanzw_frame/evolution/evolution_0001/static/ling.png" http://localhost:8080/hello
+        <b>Error:</b> Internal server error.
+        raw_data: FieldStorage(None, None, [FieldStorage('file', 'ling.png', '\x89PNG\r\n\x1a\n')])
+        <type 'instance'>
+        key: file
+        FieldStorage('file', 'ling.png', '\x89PNG\r\n\x1a\n')
+        <type 'instance'>
+        filename: ling.png
+        
+        curl -X POST -F "name=@/root/work/lanzw_frame/evolution/evolution_0001/static/ling.png" http://localhost:8080/hello
+        Hello FieldStorage('file', 'ling.png', '\x89PNG\r\n\x1a\n')!
+        raw_data: FieldStorage(None, None, [FieldStorage('file', 'ling.png', '\x89PNG\r\n\x1a\n')])
+        <type 'instance'>
+        key: name
+        FieldStorage('file', 'ling.png', '\x89PNG\r\n\x1a\n')
+        <type 'instance'>
+        filename: ling.png
+        
+        curl -X POST -H "Content-Type:application/json" -d '"name":"comewords","content":"articleContent"' http://localhost:8080/hello
+        <b>Error:</b> Internal server error.
+        raw_data: FieldStorage(None, None, '"name":"comewords","content":"articleContent"')
+        <type 'instance'>
+        Traceback (most recent call last):
+          File "evolution_0006.py", line 479, in WSGIHandler
+            global request
+          File "evolution_0006.py", line 733, in say
+          File "evolution_0006.py", line 245, in POST
+            for key in raw_data:
+          File "/usr/lib64/python2.7/cgi.py", line 517, in __iter__
+            return iter(self.keys())
+          File "/usr/lib64/python2.7/cgi.py", line 582, in keys
+            raise TypeError, "not indexable"
+        TypeError: not indexable
+
+        Error (500) on '/hello': not indexable
+        
+        curl -F "name=user" -F "password=test1" -F "password=test2" -F "password=test3" http://localhost:8080/hello
+        curl -F "name=user" -F "password=test" -F "password=test" -F "password=test" http://localhost:8080/hello
+        <b>Error:</b> Internal server error.
+        raw_data: FieldStorage(None, None, [FieldStorage('name', None, 'user'), FieldStorage('password', None, 'test'), FieldStorage('password', None, 'test'), FieldStorage('password', None, 'test')])
+        <type 'instance'>
+        key: password
+        [FieldStorage('password', None, 'test'), FieldStorage('password', None, 'test'), FieldStorage('password', None, 'test')]
+        <type 'list'>
+        Traceback (most recent call last):
+          File "evolution_0006.py", line 515, in WSGIHandler
+            output = handler(**args)
+          File "evolution_0006.py", line 769, in say
+            name = request.POST['name']
+          File "evolution_0006.py", line 249, in POST
+            if raw_data[key].filename:
+        AttributeError: 'list' object has no attribute 'filename'
+
+        Error (500) on '/hello': 'list' object has no attribute 'filename'
+        
+        
+        curl -X POST -d "name=comewords&content=articleContent1&content=articleContent2&content=articleContent3" http://localhost:8080/hello
+        <b>Error:</b> Internal server error.
+        raw_data: FieldStorage(None, None, [MiniFieldStorage('name', 'comewords'), MiniFieldStorage('content', 'articleContent1'), MiniFieldStorage('content', 'articleContent2'), MiniFieldStorage('content', 'articleContent3')])
+        <type 'instance'>
+        key: content
+        [MiniFieldStorage('content', 'articleContent1'), MiniFieldStorage('content', 'articleContent2'), MiniFieldStorage('content', 'articleContent3')]
+        <type 'list'>
+        Traceback (most recent call last):
+          File "evolution_0006.py", line 530, in WSGIHandler
+            output = handler(**args)
+          File "evolution_0006.py", line 784, in say
+            name = request.POST['name']
+          File "evolution_0006.py", line 249, in POST
+            if raw_data[key].filename:
+        AttributeError: 'list' object has no attribute 'filename'
+        
+        Error (500) on '/hello': 'list' object has no attribute 'filename'
+        
+        """
         return self._POST
 
     @property
@@ -619,7 +743,7 @@ def send_file(filename, root, guessmime=True, mimetype='text/plain'):
 def error500(exception):
     """If an exception is thrown, deal with it and present an error page."""
     if DEBUG:
-        return str(exception)
+        return "<br>\n".join(traceback.format_exc(10).splitlines()).replace('  ', '&nbsp;&nbsp;')
     else:
         return """<b>Error:</b> Internal server error."""
 
@@ -789,7 +913,7 @@ if __name__ == "__main__":
     'REMOTE_HOST': 'localhost.localdomain'
     }
     
-    curl -F "name=user" http://localhost:8080:/hello
+    curl -F "name=user" -F "password=test" http://localhost:8080/hello
     environ: 
     {
     'SERVER_SOFTWARE': 'WSGIServer/0.1 Python/2.7.5', 
