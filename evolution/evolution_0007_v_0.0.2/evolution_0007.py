@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 https://github.com/bottlepy/bottle/commit/120019bb7a532b38447a6a487d9d73732a572c30#diff-ad8cb2f640fd3a70db3fc97f3044a4e6
 """
@@ -213,7 +214,10 @@ class Request(threading.local):
         """Returns a dict with COOKIES."""
         if self._COOKIES is None:
             raw_dict = Cookie.SimpleCookie(self._environ.get('HTTP_COOKIE', ''))
+            print 'Request cookie raw_dict: {}'.format(raw_dict)
             self._COOKIES = {}
+            print 'Request raw_dict.values(): {}'.format(raw_dict.values())
+            print 'Request type(raw_dict.values()): {}'.format(type(raw_dict.values()))
             for cookie in raw_dict.values():
                 self._COOKIES[cookie.key] = cookie.value
         return self._COOKIES
@@ -234,10 +238,14 @@ class Response(threading.local):
     @property
     def COOKIES(self):
         if not self._COOKIES:
+            print 'Response COOKIES not exits'
             self._COOKIES = Cookie.SimpleCookie()
+        print 'Response COOKIES: {}'.format(self._COOKIES)
+        print 'Response type(self._COOKIES): {}'.format(type(self._COOKIES))
         return self._COOKIES
 
     def set_cookie(self, key, value, **kargs):
+        print 'class Response set_cookie'
         """ Sets a Cookie. Optional settings: expires, path, comment, domain, max-age, secure, version, httponly """
         self.COOKIES[key] = value
         for k in kargs:
@@ -380,6 +388,7 @@ def WSGIHandler(environ, start_response):
             output = iter(lambda: fileoutput.read(8192), '')
 
     for c in response.COOKIES.values():
+        print '响应头信息设置 cookies'
         response.header.add('Set-Cookie', c.OutputString())
 
     status = '%d %s' % (response.status, HTTP_CODES[response.status])
@@ -544,8 +553,15 @@ def validate(**vkargs):
             assert isinstance(cvs, list)
     '''
 
+    """
+    vkargs: {'i': <type 'int'>, 'csv': <function <lambda> at 0x20ae668>, 'f': <type 'float'>}
+    kargs: {'i': '2', 'csv': 'csv', 'f': '2.1'}
+    """
+
+    print 'vkargs: {}'.format(vkargs)
     def decorator(func):
         def wrapper(**kargs):
+            print 'kargs: {}'.format(kargs)
             for key in vkargs:
                 if key not in kargs:
                     abort(400, 'Missing parameter: %s' % key)
