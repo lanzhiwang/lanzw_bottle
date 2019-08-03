@@ -397,9 +397,9 @@ def WSGIHandler(environ, start_response):
         print 'handler: {} args: {}'.format(handler, args)  # handler: <function say at 0x2189ed8> args: {'name': 'huzhi'}
         output = handler(**args)
         print 'output: {}'.format(output)  # output: Hello huzhi!
-    except BreakTheBottle, shard:
+    except BreakTheBottle, shard:  # BreakTheBottle(open(filename, 'r'))
         output = shard.output
-    except Exception, exception:
+    except Exception, exception:  # 主要是 HTTPError 异常
         response.status = getattr(exception, 'http_status', 500)
         errorhandler = ERROR_HANDLER.get(response.status, None)
         if errorhandler:
@@ -413,9 +413,16 @@ def WSGIHandler(environ, start_response):
             else:
                 output = "Unhandled exception: Application stopped."
 
+        # 服务器内部错误处理办法
         if response.status == 500:
             request._environ['wsgi.errors'].write("Error (500) on '%s': %s\n" % (request.path, exception))
 
+    """
+    到此为止 output 主要有以下三种类型：
+    strings
+    open(filename, 'r')
+    yield
+    """
     if hasattr(output, 'read'):
         if 'wsgi.file_wrapper' in environ:
             output = environ['wsgi.file_wrapper'](output)

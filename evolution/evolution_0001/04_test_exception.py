@@ -12,6 +12,11 @@ class BottleException(Exception):
 class HTTPError(BottleException):
     """ A way to break the execution and instantly jump to an error handler. """
 
+    """
+    HTTPError(401, "Access denied.")
+    HTTPError(404, "File does not exist.")
+    HTTPError(401, "You do not have permission to access this file.")
+    """
     def __init__(self, status, text):
         self.output = text
         self.http_status = int(status)
@@ -26,5 +31,8 @@ class BreakTheBottle(BottleException):
     Causes the WSGIHandler to instantly call start_response() and return the
     content of output """
 
+    """
+    BreakTheBottle(open(filename, 'r'))
+    """
     def __init__(self, output):
         self.output = output
