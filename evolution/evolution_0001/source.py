@@ -1,22 +1,16 @@
 """
-bottle.py is a one-file micro web framework.
-Inspired by itty.py (Daniel Lindsley)
-
+bottle.py is a one-file micro web framework inspired by itty.py (Daniel Lindsley)
 Licence (MIT)
 -------------
-
     Copyright (c) 2009, Marcel Hellkamp.
-
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
     in the Software without restriction, including without limitation the rights
     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
     copies of the Software, and to permit persons to whom the Software is
     furnished to do so, subject to the following conditions:
-
     The above copyright notice and this permission notice shall be included in
     all copies or substantial portions of the Software.
-
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -24,32 +18,20 @@ Licence (MIT)
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
-
-
 Example
 -------
-
-    from bottle import route, run, request, response, send_file, abort
-
+    from bottle import route, run, request, response
     @route('/')
-    def hello_world():
+    def index():
         return 'Hello World!'
-
     @route('/hello/:name')
-    def hello_name(name):
+    def say(name):
         return 'Hello %s!' % name
-
     @route('/hello', method='POST')
-    def hello_post():
+    def say():
         name = request.POST['name']
         return 'Hello %s!' % name
-
-    @route('/static/:filename#.*#')
-    def static_file(filename):
-        send_file(filename, root='/path/to/static/files/')
-
     run(host='localhost', port=8080)
-
 """
 
 __author__ = 'Marcel Hellkamp'
@@ -224,7 +206,7 @@ class Request(threading.local):
     def GET(self):
         """Returns a dict with GET parameters."""
         if self._GET is None:
-            raw_dict = parse_qs(self.query_string, keep_blank_values=1)
+            raw_dict = parse_qs(self.query, keep_blank_values=1)
             self._GET = {}
             for key, value in raw_dict.items():
                 if len(value) == 1:
@@ -304,11 +286,9 @@ class Response(threading.local):
 
 def compile_route(route):
     """ Compiles a route string and returns a precompiled RegexObject.
-
     Routes may contain regular expressions with named groups to support url parameters.
     Example:
       '/user/(?P<id>[0-9]+)' will match '/user/5' with {'id':'5'}
-
     A more human readable syntax is supported too.
     Example:
       '/user/:id/:action' will match '/user/5/kiss' with {'id':'5', 'action':'kiss'}
@@ -348,7 +328,6 @@ def match_url(url, method='GET'):
 
 def add_route(route, handler, method='GET', simple=False):
     """ Adds a new route to the route mappings.
-
         Example:
         def hello():
           return "Hello world!"
@@ -570,3 +549,5 @@ def error404(exception):
 
 request = Request()
 response = Response()
+
+# len(__file__) == 600  :D
