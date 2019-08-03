@@ -23,6 +23,7 @@ import re
 import random
 import Cookie
 import threading
+import time
 
 try:
     from urlparse import parse_qs
@@ -440,9 +441,12 @@ def WSGIHandler(environ, start_response):
     判断 Content-Length 是否存在可以防止覆盖框架使用者设置的 Content-Length 头信息
     有时框架使用者会自己设置 Content-Length 信息，此时不能覆盖
     """
+
+    """
     if hasattr(output, 'fileno') and 'Content-Length' not in response.header:
         size = os.fstat(output.fileno()).st_size
         response.header['Content-Length'] = size
+    """
 
     if hasattr(output, 'read'):
         fileoutput = output
@@ -576,6 +580,14 @@ def send_file(filename, root, guessmime=True, mimetype='text/plain'):
         response.content_type = mimetype
 
     # TODO: Add Last-Modified header (Wed, 15 Nov 1995 04:58:08 GMT)
+    stats = os.stat(filename)
+    if 'Content-Length' not in response.header:
+        response.header['Content-Length'] = stats.st_size
+    if 'Last-Modified' not in response.header:
+        ts = time.gmtime(stats.st_mtime)
+        ts = time.strftime("%a, %d %b %Y %H:%M:%S +0000", ts)
+        response.header['Last-Modified'] = ts
+
     raise BreakTheBottle(open(filename, 'r'))
 
 
