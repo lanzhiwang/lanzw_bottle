@@ -501,7 +501,11 @@ class PasteServer(ServerAdapter):
     # server.run(WSGIHandler)
     def run(self, handler):
         from paste import httpserver
-        httpserver.serve(handler, host=self.host, port=str(self.port))
+        # httpserver.serve(handler, host=self.host, port=str(self.port))
+        # Added access logging for PasterServer
+        from paste.translogger import TransLogger
+        app = TransLogger(handler)
+        httpserver.serve(app, host=self.host, port=str(self.port))
 
 
 # run(host='localhost', port=8080)
