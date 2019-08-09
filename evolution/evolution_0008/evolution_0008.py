@@ -99,6 +99,10 @@ def WSGIHandler(environ, start_response):
 
     status = '%d %s' % (response.status, HTTP_CODES[response.status])
     start_response(status, list(response.header.items()))
+    print isinstance(output, str)
+    if isinstance(output, str):
+        output = [output]
+    print output
     return output
 
 
@@ -529,7 +533,8 @@ class BaseTemplate(object):
         eval(self.co, {}, args)
         return ''.join(args['stdout'])
 
-
+# TEMPLATE_GENERATOR(name)
+# lambda x: SimpleTemplate(open('./%s.tpl' % x, 'r').read())
 class SimpleTemplate(BaseTemplate):
     re_block = re.compile(r'^\s*%\s*((if|elif|else|try|except|finally|for|while|with).*:)\s*$')
     re_end = re.compile(r'^\s*%\s*end(.*?)\s*$')
@@ -604,17 +609,45 @@ class SimpleTemplate(BaseTemplate):
 
 def render_template(name, **args):
     ''' Returns a string from a template '''
+    print 'TEMPLATES: {}'.format(TEMPLATES)  # TEMPLATES: {}
     if name not in TEMPLATES:
         TEMPLATES[name] = TEMPLATE_GENERATOR(name)
+    print 'TEMPLATES: {}'.format(TEMPLATES)  # TEMPLATES: {'example': <evolution_0008.SimpleTemplate object at 0x1cfb650>}
 
     args['subtemplate'] = render_template
+    print 'args: {}'.format(args)  # args: {'items': ['Bottle is nice!', 2, 0.09], 'subtemplate': <function render_template at 0x1ce3050>}
     return TEMPLATES[name].render(**args)
 
-
+# render('example', items=items)
 def render(template, **args):
     """ Aborts execution and renders the key arguments into a template """
-    raise BreakTheBottle(render_template(template, **args))
-
+    print 'template: {}'.format(template)  # template: example
+    print 'args: {}'.format(args)  # args: {'items': ['Bottle is nice!', 2, 0.09]}
+    temp = render_template(template, **args)
+    print temp
+    """
+    <html>
+      <head>
+        <title>Test Template</title>
+      </head>
+      <body>
+        <h1>Test Template</h1>
+        <p>Items in list: 3</p>
+        <ul>
+          <li>
+            Other type: (str) 'Bottle is nice!'
+          </li>
+          <li>
+            Zahl: 2
+          </li>
+          <li>
+            Other type: (float) 0.09
+          </li>
+        </ul>
+      </body>
+    </html>
+    """
+    raise BreakTheBottle(temp)
 
 # Modul initialization
 
