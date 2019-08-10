@@ -5,7 +5,7 @@ DISTDIR = os.path.dirname(TESTDIR)
 sys.path.insert(0, TESTDIR)
 sys.path.insert(0, DISTDIR)
 
-from bottle import SimpleTemplate
+from evolution_0011 import SimpleTemplate
 
 class TestSimpleTemplate(unittest.TestCase):
 
