@@ -1,4 +1,4 @@
-from bottle import route, run, request, response, send_file, abort, validate, template, db
+from evolution_0011 import route, run, request, response, send_file, abort, validate, template, db
 
 # Lets start with "Hello World!"
 # Point your Browser to 'http://localhost:8080/' and greet the world :D
@@ -80,6 +80,6 @@ def db_counter_test():
     db['counter']['hits'] +=  1
     return "Total hits in this page: %d!" % db.counter.hits
 
-import bottle
-bottle.DEBUG = True
-run(server=bottle.PasteServer, host='localhost', port=8080) 
+import evolution_0011
+evolution_0011.DEBUG = True
+run(server=evolution_0011.PasteServer, host='localhost', port=8080)
