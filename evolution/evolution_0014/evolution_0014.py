@@ -435,6 +435,3 @@ def debug(mode=True):
 
 def optimize(mode=True):
     default_app().optimize = bool(mode)
-
-
-
