@@ -80,12 +80,16 @@ class Page(object):
             return False
 
 def iter_blogposts():
+    # print os.path.join(Page.pagedir, '*.md')  # ../docs/*.md
+    # print glob.glob(os.path.join(Page.pagedir, '*.md'))  # ['../docs/contact.md', '../docs/docs.md']
     for post in glob.glob(os.path.join(Page.pagedir, '*.md')):
         name = os.path.basename(post)[:-3]
         if re.match(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}_', name):
+            # print name
             yield Page(name)
 
-
+# for page in iter_blogposts():
+#     print page
 
 
 
@@ -110,7 +114,7 @@ def page(name='start'):
         return bottle.HTTPError(404, 'Page not found')
 
 
-@route('/rss.xml')
+@route('/rss.xml', method='POST')
 @view('rss')
 def blogrss():
     response.content_type = 'xml/rss'
@@ -128,5 +132,9 @@ def bloglist():
 
 
 # Start server
-#bottle.debug(True)
-bottle.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=bottle.PasteServer)
+# print sys.argv  # ['app.py', '8080']
+bottle.debug(True)
+bottle.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=bottle.WSGIRefServer)
+
+
+
