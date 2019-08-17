@@ -17,6 +17,12 @@ except:
 import mimetypes
 import uuid
 
+def tob(data):
+  if isinstance(data, unicode):
+    return data.encode('utf8')
+  else:
+    return data
+
 class MethodRequest(urllib2.Request):
     ''' Used to create HEAD/PUT/DELETE/... requests with urllib2 '''
     def set_method(self, method):
@@ -67,9 +73,7 @@ class ServerTestBase(unittest.TestCase):
         ''' Create a new Bottle app set it as default_app and register it to urllib2 '''
         self.port = 61382
         self.host = 'localhost'
-        self.app = bottle.Bottle()
-        self.oldapp = bottle.default_app()
-        bottle.default_app(self.app)
+        self.app = bottle.app.push()
         self.server = TestServer(host=self.host, port=self.port)
         self.urlopen = self.server.urlopen
         self.thread = threading.Thread(target=bottle.run, args=(), kwargs=dict(app=self.app, server=self.server, quiet=True))
@@ -80,7 +84,7 @@ class ServerTestBase(unittest.TestCase):
         ''' Recover the olt default_app and remove wsgi_intercept from urllib2 '''
         self.server.shutdown()
         self.thread.join()
-        bottle.default_app(self.oldapp)
+        bottle.app.pop()
     
     def same(self, data, url):
         if isinstance(data, unicode):
