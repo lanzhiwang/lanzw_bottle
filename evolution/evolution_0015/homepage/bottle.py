@@ -5,6 +5,9 @@ https://github.com/bottlepy/bottle/commit/7616b678827c5d7eff8b265776f9b08203966d
 
 https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+805&path%5B%5D=bottle.py
 
+
+
+https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+665&path%5B%5D=bottle.py
 """
 
 __author__ = 'Marcel Hellkamp'
@@ -125,6 +128,7 @@ class RouteParser(object):
     syntax = re.compile(r'(.*?)(?<!\\):([a-zA-Z_]+)?(?:#(.*?)#)?')
     default = '[^/]+'
 
+    # parsed = RouteParser(route)
     def __init__(self, route):
         self.route = route
 
@@ -193,6 +197,7 @@ class Router(object):
         self.dynamic = []
         self.named = dict()
 
+    # add(path, handler, **kargs)
     def add(self, route, target, static=False, name=None):
         parsed = RouteParser(route)
         static = bool(static or not parsed.is_dynamic())
