@@ -1,7 +1,7 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from bottle import route, view, response
-import bottle
+from evolution_0016 import route, view, response
+import evolution_0016
 import markdown
 import os.path
 import sys
@@ -96,13 +96,11 @@ def iter_blogposts():
 
 # Static files
 
-@route('/:filename#.+\.(css|js|ico|png|txt|html)#')
-def static(filename):
-    return bottle.static_file(filename, root='./static/')
+# @route('/:filename#.+\.(css|js|ico|png|txt|html)#')
+# def static(filename):
+#     return evolution_0016.static_file(filename, root='./static/')
 
-
-# Bottle Pages
-
+"""
 @route('/')
 @route('/page/:name')
 @view('page')
@@ -111,30 +109,98 @@ def page(name='start'):
     if p.exists:
         return dict(page=p)
     else:
-        return bottle.HTTPError(404, 'Page not found')
+        return evolution_0016.HTTPError(404, 'Page not found')
+"""
 
 
-@route('/rss.xml', method='POST')
-@view('rss')
-def blogrss():
-    response.content_type = 'xml/rss'
-    posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
-    posts.sort(key=lambda x: x.blogtime, reverse=True)
-    return dict(posts=posts)
+# wrapper = decorator(page)
+
+def page(name='start'):
+    p = Page(name) #replace('/','_')? Routes don't match '/' so this is save
+    if p.exists:
+        return dict(page=p)
+    else:
+        return evolution_0016.HTTPError(404, 'Page not found')
 
 
-@route('/blog')
-@view('blogposts')
-def bloglist():
-    posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
-    posts.sort(key=lambda x: x.blogtime, reverse=True)
-    return dict(posts=posts)
+print 'page type: {} page id: {}'.format(type(page), id(page))
+
+print 'decorator = view(\'page\')'
+decorator = view('page')
+print 'decorator type: {} decorator id: {}'.format(type(decorator), id(decorator))
+
+print 'wrapper = decorator(page)'
+wrapper = decorator(page)
+print 'wrapper type: {} wrapper id: {}'.format(type(wrapper), id(wrapper))
+
+print 'w1 = route(\'/page/:name\')'
+w1 = route('/page/:name')
+print 'w1 type: {} w1 id: {}'.format(type(w1), id(w1))
+
+print 'w2 = w1(wrapper)'
+w2 = w1(wrapper)
+print 'w2 type: {} w2 id: {}'.format(type(w2), id(w2))
+
+print 'w3 = route(\'/\')'
+w3 = route('/')
+print 'w3 type: {} w3 id: {}'.format(type(w3), id(w3))
+
+print 'w4 = w3(w2)'
+w4 = w3(w2)
+print 'w4 type: {} w4 id: {}'.format(type(w4), id(w4))
+
+"""
+(venv) [root@huzhi-code evolution_0016]# python app.py 8080
+page type: <type 'function'> page id: 22970568
+decorator = view('page')
+============ 1 ============
+decorator type: <type 'function'> decorator id: 22970688
+wrapper = decorator(page)
+wrapper type: <type 'function'> wrapper id: 22970808
+w1 = route('/page/:name')
+w1 type: <type 'function'> w1 id: 22970928
+w2 = w1(wrapper)
+============ 2 ============
+<type 'function'>
+22970808
+w2 type: <type 'function'> w2 id: 22970808
+w3 = route('/')
+w3 type: <type 'function'> w3 id: 22971048
+w4 = w3(w2)
+============ 2 ============
+<type 'function'>
+22970808
+w4 type: <type 'function'> w4 id: 22970808
+Bottle server starting up (using WSGIRefServer())...
+Listening on http://0.0.0.0:8080/
+Use Ctrl-C to quit.
+
+^CShutting down...
+(venv) [root@huzhi-code evolution_0016]#
+"""
+
+#
+# @route('/rss.xml', method='POST')
+# @view('rss')
+# def blogrss():
+#     response.content_type = 'xml/rss'
+#     posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
+#     posts.sort(key=lambda x: x.blogtime, reverse=True)
+#     return dict(posts=posts)
+#
+#
+# @route('/blog')
+# @view('blogposts')
+# def bloglist():
+#     posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
+#     posts.sort(key=lambda x: x.blogtime, reverse=True)
+#     return dict(posts=posts)
 
 
 # Start server
 # print sys.argv  # ['app.py', '8080']
-bottle.debug(True)
-bottle.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=bottle.WSGIRefServer)
+evolution_0016.debug(True)
+evolution_0016.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=evolution_0016.WSGIRefServer)
 
 
 
