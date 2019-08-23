@@ -73,4 +73,34 @@ for rule in yieldroutes(c):
 
 for rule in yieldroutes(d):
     print 'rule: {}'.format(rule)
+    """
+    rule: /d
+    rule: /d/:x
+    rule: /d/:x/:y
+    """
+
+
+def makelist(data):
+    if isinstance(data, (tuple, list, set, dict)):
+        return list(data)
+    elif data:
+        return [data]
+    else:
+        return []
+
+
+for rule in makelist('') or yieldroutes(d):
+    print rule
+    """
+    /d
+    /d/:x
+    /d/:x/:y
+    """
+
+for rule in makelist(['/a','/b']) or yieldroutes(d):
+    print rule
+    """
+    /a
+    /b
+    """
 

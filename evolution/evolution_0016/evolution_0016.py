@@ -257,6 +257,24 @@ class Router(object):
         self.static = {}  # Cache for static routes: {path: {method: target}}
         self.dynamic = []  # Cache for dynamic routes. See _compile()
 
+    """
+    self.router.add(rule, verb, len(self.routes), name=name)
+    self.routes.append((func, decorators))
+    
+    add('/static')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/')
+    add('/:test')
+    add(':test/')
+    add('/:test/')
+    add('test')
+    add(':#anon#/match')
+    add('/alpha/:abc')
+    add('/alnum/:md5')
+    add('/func(:param)')
+    add('/func2(:param#(foo|bar)#)')
+    add('/:test/:name#[a-z]+#/')
+    add('/anon/:#.#')
+    """
     def add(self, rule, method, target, name=None):
         ''' Add a new route or overwrite an existing target. '''
         if rule in self.routes:
@@ -310,6 +328,10 @@ class Router(object):
         if args: url += ['?', urlencode(args.iteritems())]
         return ''.join(url)
 
+    """
+    env = {'PATH_INFO': path, 'REQUEST_METHOD': method}
+    match(env)
+    """
     def match(self, environ):
         ''' Return a (target, url_agrs) tuple or raise HTTPError(404/405). '''
         targets, urlargs = self._match_path(environ)
@@ -329,6 +351,11 @@ class Router(object):
         raise HTTPError(405, "Method not allowed.",
                         header=[('Allow', ",".join(allowed))])
 
+
+    """
+    env = {'PATH_INFO': path, 'REQUEST_METHOD': method}
+    match(env)
+    """
     def _match_path(self, environ):
         ''' Optimized PATH_INFO matcher. '''
         path = environ['PATH_INFO'] or '/'
@@ -477,35 +504,57 @@ class Bottle(object):
         location = self.router.build(routename, **kargs).lstrip('/')
         return urljoin(urljoin('/', scriptname), location)
 
+    """
+    route('/my-öäü/:string')
+    route("/<code:int>")
+    route(['/a','/b'])
+    route()
+    route
+    route(method=['GET','post'])
+    route('/dec', apply=revdec)
+    route('/revtitle', apply=[revdec, titledec])
+    route(template='test {{a}} {{b}}')
+    route(template=('test {{a}} {{b}}', {'b': 6}))
+    route(name='foo')
+    route(callback=test)
+    
+    route('/dec', decorate=revdec)
+    route('/revtitle', decorate=[revdec, titledec])
+    
+    route(no_hooks=True)
+    route(template='test {{a}} {{b}}', template_opts={'b': 6})
+    route('/:foo', static=True)
+    """
     def route(self, path=None, method='GET', no_hooks=False, decorate=None,
               template=None, template_opts={}, callback=None, name=None,
               static=False):
-        """ Decorator: Bind a callback function to a request path.
 
-            :param path: The request path or a list of paths to listen to. See
-              :class:`Router` for syntax details. If no path is specified, it
-              is automatically generated from the callback signature. See
-              :func:`yieldroutes` for details.
-            :param method: The HTTP method (POST, GET, ...) or a list of
-              methods to listen to. (default: GET)
-            :param decorate: A decorator or a list of decorators. These are
-              applied to the callback in reverse order (on demand only).
-            :param no_hooks: If true, application hooks are not triggered
-              by this route. (default: False)
-            :param template: The template to use for this callback.
-              (default: no template)
-            :param template_opts: A dict with additional template parameters.
-            :param name: The name for this route. (default: None)
-            :param callback: If set, the route decorator is directly applied
-              to the callback and the callback is returned instead. This
-              equals ``Bottle.route(...)(callback)``.
+
         """
-        # @route can be used without any parameters
-        if callable(path): path, callback = None, path
-        # Build up the list of decorators
+        用于 route 方法没有参数的情况，如下所示
+        route()
+        route
+        """
+        if callable(path):
+            path, callback = None, path
+
+        """
+        route('/dec', decorate=revdec)
+        route('/revtitle', decorate=[revdec, titledec])
+        """
         decorators = makelist(decorate)
-        if template:     decorators.insert(0, view(template, **template_opts))
-        if not no_hooks: decorators.append(self._add_hook_wrapper)
+
+        """
+        route(template='test {{a}} {{b}}', template_opts={'b': 6})
+        """
+        if template:
+            decorators.insert(0, view(template, **template_opts))
+
+        """
+        route(no_hooks=True)
+        """
+        if not no_hooks:
+            decorators.append(self._add_hook_wrapper)
 
         # decorators.append(partial(self.apply_plugins, skiplist))
         def wrapper(func):
@@ -519,7 +568,12 @@ class Bottle(object):
                     self.routes.append((func, decorators))
             return func
 
-        return wrapper(callback) if callback else wrapper
+        # route(callback=test)
+        if callback:
+            return wrapper(callback)
+        else:
+            return wrapper
+        # return wrapper(callback) if callback else wrapper
 
     def _add_hook_wrapper(self, func):
         ''' Add hooks to a callable. See #84 '''
