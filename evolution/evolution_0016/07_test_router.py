@@ -3,53 +3,6 @@
 import re
 import functools
 
-from functools import wraps
-
-"""
-functools.update_wrapper(wrapper, wrapped[, assigned][, updated])
-functools.wraps(wrapped[, assigned][, updated])
-
-wraps = partial(update_wrapper, wrapped=wrapped, assigned=assigned, updated=updated)
-"""
-
-def my_decorator(f):
-    # @wraps(f)
-    def wrapper(*args, **kwds):
-        print 'Calling decorated function'
-        return f(*args, **kwds)
-    w = wraps(f)  # update_wrapper(w, f)
-    wrapper = w(wrapper)
-    return wrapper
-
-
-# @my_decorator
-def example():
-    """Docstring"""
-    print 'Called example function'
-example = my_decorator(example)
-
-
-example()
-print example.__name__
-print example.__doc__
-
-"""
-Calling decorated function
-Called example function
-example
-Docstring
-"""
-
-
-
-
-
-
-
-
-
-
-
 
 class HTTPError(object):
     pass
@@ -72,12 +25,6 @@ class RouteBuildError(RouteError):
     """ The route could not been built """
 
 
-"""
-functools.update_wrapper(wrapper, wrapped[, assigned][, updated])
-functools.wraps(wrapped[, assigned][, updated])
-
-wraps = partial(update_wrapper, wrapped=wrapped, assigned=assigned, updated=updated)
-"""
 class lazy_attribute(object):  # Does not need configuration -> lower-case name
     ''' A property that caches itself to the class object. '''
 
@@ -99,11 +46,9 @@ class Router(object):
         return re.compile(r'(?<!\\):([a-zA-Z_][a-zA-Z_0-9]*)?(?:#(.*?)#)?')
 
     """
+    等价于
     syntax = lazy_attribute(syntax)
-
-    self.syntax
-    self.syntax = 
-    del self.syntax
+    syntax = re.compile(r'(?<!\\):([a-zA-Z_][a-zA-Z_0-9]*)?(?:#(.*?)#)?')
     """
 
     def __init__(self):
@@ -116,21 +61,20 @@ class Router(object):
 
     """
     self.router.add(rule, verb, len(self.routes), name=name)
-    self.routes.append((func, decorators))
 
-    add('/static')
-    add('/\\:its/:#.+#/:test/:name#[a-z]+#/')
-    add('/:test')
-    add(':test/')
-    add('/:test/')
-    add('test')
-    add(':#anon#/match')
-    add('/alpha/:abc')
-    add('/alnum/:md5')
-    add('/func(:param)')
-    add('/func2(:param#(foo|bar)#)')
-    add('/:test/:name#[a-z]+#/')
-    add('/anon/:#.#')
+    add('/static', method, target, name=None)
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', method, target, name=None)
+    add('/:test', method, target, name=None)
+    add(':test/', method, target, name=None)
+    add('/:test/', method, target, name=None)
+    add('test', method, target, name=None)
+    add(':#anon#/match', method, target, name=None)
+    add('/alpha/:abc', method, target, name=None)
+    add('/alnum/:md5', method, target, name=None)
+    add('/func(:param)', method, target, name=None)
+    add('/func2(:param#(foo|bar)#)', method, target, name=None)
+    add('/:test/:name#[a-z]+#/', method, target, name=None)
+    add('/anon/:#.#', method, target, name=None)
     """
     def add(self, rule, method, target, name=None):
         ''' Add a new route or overwrite an existing target. '''
