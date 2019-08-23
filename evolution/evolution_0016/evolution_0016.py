@@ -500,26 +500,88 @@ class Bottle(object):
               to the callback and the callback is returned instead. This
               equals ``Bottle.route(...)(callback)``.
         """
+
+        """
+        处理第1个路由
+route('/:filename#.+\.(css|js|ico|png|txt|html)#')
+
+
+
+
+
+
+
+
+
+
+
+
+
+decorate: None
+decorate: None
+route(static)
+static
+['/:filename#.+\\.(css|js|ico|png|txt|html)#']
+<generator object yieldroutes at 0x1613870>
+/:filename#.+\.(css|js|ico|png|txt|html)#
+['GET']
+[(<function static at 0x166d140>, [<bound method Bottle._add_hook_wrapper of <evolution_0016.Bottle object at 0x10ea350>>])]
+Bottle server starting up (using WSGIRefServer())...
+        """
+        print 'path: {}'.format(path)  # path: /:filename#.+\.(css|js|ico|png|txt|html)#
+        print 'method: {}'.format(method)  # method: GET
+        print 'no_hooks: {}'.format(no_hooks)  # no_hooks: False
+        print 'decorate: {}'.format(decorate)  # decorate: None
+        print 'template: {}'.format(template)  # template: None
+        print 'template_opts: {}'.format(template_opts)  # template_opts: {}
+        print 'callback: {}'.format(callback)  # callback: None
+        print 'name: {}'.format(name)  # name: None
+        print 'static: {}'.format(static)  # static: False
+
         # @route can be used without any parameters
-        if callable(path): path, callback = None, path
+        print 'callable(path): {}'.format(callable(path))  # callable(path): False
+        if callable(path):
+            path, callback = None, path
+        print 'path: {}'.format(path)  # path: /:filename#.+\.(css|js|ico|png|txt|html)#
+        print 'callback: {}'.format(callback)  # callback: None
+
         # Build up the list of decorators
         decorators = makelist(decorate)
-        if template:     decorators.insert(0, view(template, **template_opts))
-        if not no_hooks: decorators.append(self._add_hook_wrapper)
+        print 'decorate: {}'.format(decorate)  # decorate: None
+
+        if template:
+            decorators.insert(0, view(template, **template_opts))
+        print 'decorate: {}'.format(decorate)  # decorate: None
+
+        if not no_hooks:
+            decorators.append(self._add_hook_wrapper)
+        print 'decorate: {}'.format(decorate)  # decorate: None
 
         # decorators.append(partial(self.apply_plugins, skiplist))
         def wrapper(func):
+            print func.__name__  # static
+            print makelist(path)  # ['/:filename#.+\\.(css|js|ico|png|txt|html)#']
+            print yieldroutes(func)  # <generator object yieldroutes at 0x1613870>
             for rule in makelist(path) or yieldroutes(func):
+                print rule  # /:filename#.+\.(css|js|ico|png|txt|html)#
+
+                print makelist(method)  # ['GET']
                 for verb in makelist(method):
                     if static:
                         rule = rule.replace(':', '\\:')
                         depr("Use backslash to escape ':' in routes.")
                     # TODO: Prepare this for plugins
+                    print self.routes  # []
                     self.router.add(rule, verb, len(self.routes), name=name)
                     self.routes.append((func, decorators))
+                    print self.routes  # [(<function static at 0x17ae140>, [<bound method Bottle._add_hook_wrapper of <evolution_0016.Bottle object at 0x122e350>>])]
             return func
 
-        return wrapper(callback) if callback else wrapper
+        if callback:
+            return wrapper(callback)
+        else:
+            return wrapper
+        # return wrapper(callback) if callback else wrapper
 
     def _add_hook_wrapper(self, func):
         ''' Add hooks to a callable. See #84 '''

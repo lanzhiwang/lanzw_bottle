@@ -1,7 +1,7 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from bottle import route, view, response
-import bottle
+from evolution_0016 import route, view, response
+import evolution_0016
 import markdown
 import os.path
 import sys
@@ -96,45 +96,64 @@ def iter_blogposts():
 
 # Static files
 
-@route('/:filename#.+\.(css|js|ico|png|txt|html)#')
+# @route('/:filename#.+\.(css|js|ico|png|txt|html)#')
 def static(filename):
-    return bottle.static_file(filename, root='./static/')
+    return evolution_0016.static_file(filename, root='./static/')
+
+print '处理第1个路由'
+print 'route(\'/:filename#.+\.(css|js|ico|png|txt|html)#\')'
+route = route('/:filename#.+\.(css|js|ico|png|txt|html)#')
+print 'route(static)'
+route(static)
 
 
 # Bottle Pages
 
-@route('/')
-@route('/page/:name')
-@view('page')
+# @route('/')
+# @route('/page/:name')
+# @view('page')
 def page(name='start'):
     p = Page(name) #replace('/','_')? Routes don't match '/' so this is save
     if p.exists:
         return dict(page=p)
     else:
-        return bottle.HTTPError(404, 'Page not found')
+        return evolution_0016.HTTPError(404, 'Page not found')
+
+print '处理第2个路由'
+
+route('/')(route('/page/:name')(view('page')(page)))
 
 
-@route('/rss.xml', method='POST')
-@view('rss')
-def blogrss():
-    response.content_type = 'xml/rss'
-    posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
-    posts.sort(key=lambda x: x.blogtime, reverse=True)
-    return dict(posts=posts)
+# decorator = view('page')
+# p = decorator(page)
+# print p  # <function page at 0x21c9320>
+# wrapper = route('/page/:name')
+# print wrapper(p)
 
 
-@route('/blog')
-@view('blogposts')
-def bloglist():
-    posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
-    posts.sort(key=lambda x: x.blogtime, reverse=True)
-    return dict(posts=posts)
+
+#
+# @route('/rss.xml', method='POST')
+# @view('rss')
+# def blogrss():
+#     response.content_type = 'xml/rss'
+#     posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
+#     posts.sort(key=lambda x: x.blogtime, reverse=True)
+#     return dict(posts=posts)
+#
+#
+# @route('/blog')
+# @view('blogposts')
+# def bloglist():
+#     posts = [post for post in iter_blogposts() if post.exists and post.is_blogpost]
+#     posts.sort(key=lambda x: x.blogtime, reverse=True)
+#     return dict(posts=posts)
 
 
 # Start server
 # print sys.argv  # ['app.py', '8080']
-bottle.debug(True)
-bottle.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=bottle.WSGIRefServer)
+evolution_0016.debug(True)
+evolution_0016.run(host='0.0.0.0', reloader=False, port=int(sys.argv[1]), server=evolution_0016.WSGIRefServer)
 
 
 
