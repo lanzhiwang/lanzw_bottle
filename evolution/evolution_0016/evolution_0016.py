@@ -225,7 +225,7 @@ class RouteSyntaxError(RouteError):
 class RouteBuildError(RouteError):
     """ The route could not been built """
 
-
+# 测试说明 test_router.py
 class Router(object):
     ''' A Router is an ordered collection of route->target pairs. It is used to
         efficiently match WSGI requests against a number of routes and return
