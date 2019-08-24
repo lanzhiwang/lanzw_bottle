@@ -78,6 +78,13 @@ class Router(object):
     """
     def add(self, rule, method, target, name=None):
         ''' Add a new route or overwrite an existing target. '''
+        # print 'routes: {}'.format(self.routes)
+        # print 'rules: {}'.format(self.rules)
+        # print 'named: {}'.format(self.named)
+        # print 'static: {}'.format(self.static)
+        # print 'dynamic: {}'.format(self.dynamic)
+        # print '-----------' * 10
+
         if rule in self.routes:
             self.routes[rule][method.upper()] = target
         else:
@@ -88,6 +95,32 @@ class Router(object):
         if name:
             self.named[name] = (rule, None)
 
+    """
+    routes: 
+    {
+    '/\\:its/:#.+#/:test/:name#[a-z]+#/': {'PUT': 10, 'POST': 9, 'ALL': 12, 'HEAD': 11, 'GET': 8}, 
+    '/func(:param)': {'GET': 7}, 
+    '/static': {'ALL': 5, 'GET': 1, 'HEAD': 4, 'PUT': 3, 'POST': 2, 'DELETE': 6}, 
+    '/': {'GET': 0}
+    }
+        
+    named: 
+    {
+    'name10': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name11': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name12': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name6': ('/static', None), 
+    'name7': ('/func(:param)', None), 
+    'name4': ('/static', None), 
+    'name5': ('/static', None), 
+    'name2': ('/static', None), 
+    'name3': ('/static', None), 
+    'name0': ('/', None), 
+    'name1': ('/static', None), 
+    'name8': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name9': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None)
+    }
+    """
     def delete(self, rule, method=None):
         ''' Delete an existing route. Omit `method` to delete all targets. '''
         if rule not in self.routes and rule in self.named:
@@ -130,13 +163,17 @@ class Router(object):
         return ''.join(url)
 
     """
-    env = {'PATH_INFO': '/test', 'REQUEST_METHOD': 'get'}
+    env = {'PATH_INFO': '/static', 'REQUEST_METHOD': 'get'}
+    env = {'PATH_INFO': '/:its/a/cruel/world/', 'REQUEST_METHOD': 'get'}
+    
     env = {'PATH_INFO': path, 'REQUEST_METHOD': method}
     match(env)
     """
     def match(self, environ):
         ''' Return a (target, url_agrs) tuple or raise HTTPError(404/405). '''
         targets, urlargs = self._match_path(environ)
+        # print 'targets:{}, urlargs:{}'.format(targets, urlargs)
+        # targets:{'ALL': 5, 'GET': 1, 'HEAD': 4, 'PUT': 3, 'POST': 2, 'DELETE': 6}, urlargs:{}
         if not targets:
             raise HTTPError(404, "Not found: " + environ['PATH_INFO'])
         environ['router.url_args'] = urlargs
@@ -155,54 +192,48 @@ class Router(object):
 
 
     """
-    env = {'PATH_INFO': path, 'REQUEST_METHOD': method}
-    
-    env = {'PATH_INFO': '/test', 'REQUEST_METHOD': 'get'}
+    env = {'PATH_INFO': '/static', 'REQUEST_METHOD': 'get'}
+    env = {'PATH_INFO': '/:its/a/cruel/world/', 'REQUEST_METHOD': 'get'}
     """
     def _match_path(self, environ):
+        # print 'static: {}'.format(self.static)
+        # print 'dynamic: {}'.format(self.dynamic)
+        """
+        static: {}
+        dynamic: []
+        
+        static: 
+        {
+        '/static': {'ALL': 5, 'GET': 1, 'HEAD': 4, 'PUT': 3, 'POST': 2, 'DELETE': 6}, 
+        '/': {'GET': 0}
+        }
+        dynamic: [(<_sre.SRE_Pattern object at 0x1d96200>, [(<_sre.SRE_Pattern object at 0x7f99881eebf8>, {'GET': 7}), (<_sre.SRE_Pattern object at 0x1d80850>, {'ALL': 12, 'GET': 8, 'HEAD': 11, 'PUT': 10, 'POST': 9, 'DELETE': 13})])]
+        [(                                                    ), (), ()]
+        [(<re>, [                                            ]), (), ()]
+        [(<re>, [(                                      ), ()]), (), ()]
+        [(<re>, [(<re>, {method: target, method: target}), ()]), (), ()]
+        """
 
-        path = environ['PATH_INFO'] or '/'
+        ''' Optimized PATH_INFO matcher. '''
+        path = environ['PATH_INFO'] or '/'  # /:its/a/cruel/world/
 
         # Assume we are in a warm state. Search compiled rules first.
-        print self.static
-        print self.dynamic
-        """
-        {
-        'test': {'GET': 0}, 
-        '/static': {'POST': 0, 'GET': 0}
-        }
-        
-        [
-        (<_sre.SRE_Pattern object at 0x7fd76e09ca00>, 
-        [(<_sre.SRE_Pattern object at 0x10dff97e0>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10df88c68>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10df88e90>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10dfdcab0>, {'GET': 0}), 
-        (None, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10e0e7200>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10e0e72e8>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10e0e73d0>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10e0194f0>, {'GET': 0}), 
-        (<_sre.SRE_Pattern object at 0x10dfb0730>, {'GET': 0}), 
-        (None, {'GET': 0})])
-        ]
-
-        """
-
         match = self.static.get(path)
         if match:
             return match, {}
 
         for combined, rules in self.dynamic:
+            # print combined  # <_sre.SRE_Pattern object at 0x1d96200>
+            # print rules  # [(<_sre.SRE_Pattern object at 0x7f99881eebf8>, {'GET': 7}), (<_sre.SRE_Pattern object at 0x1d80850>, {'ALL': 12, 'GET': 8, 'HEAD': 11, 'PUT': 10, 'POST': 9, 'DELETE': 13})]
             match = combined.match(path)
-            if not match: continue
+            if not match:
+                continue
             gpat, match = rules[match.lastindex - 1]
             return match, gpat.match(path).groupdict() if gpat else {}
 
         # Lazy-check if we are really in a warm state. If yes, stop here.
         if self.static or self.dynamic or not self.routes:
             return None, {}
-
 
         # Cold state: We have not compiled any rules yet. Do so and try again.
         if not environ.get('wsgi.run_once'):
@@ -212,14 +243,21 @@ class Router(object):
         # For run_once (CGI) environments, don't compile. Just check one by one.
         epath = path.replace(':', '\\:')  # Turn path into its own static rule.
         match = self.routes.get(epath)  # This returns static rule only.
-        if match: return match, {}
+        if match:
+            return match, {}
         for rule in self.rules:
             #: Skip static routes to reduce re.compile() calls.
-            if rule.count(':') < rule.count('\\:'): continue
+            if rule.count(':') < rule.count('\\:'):
+                continue
             match = self._compile_pattern(rule).match(path)
-            if match: return self.routes[rule], match.groupdict()
+            if match:
+                return self.routes[rule], match.groupdict()
         return None, {}
 
+    """
+    env = {'PATH_INFO': '/static', 'REQUEST_METHOD': 'get'}
+    env = {'PATH_INFO': '/:its/a/cruel/world/', 'REQUEST_METHOD': 'get'}
+    """
     def _compile(self):
         ''' Prepare static and dynamic search structures. '''
         self.static = {}
@@ -228,6 +266,16 @@ class Router(object):
         def fpat_sub(m):
             return m.group(0) if len(m.group(1)) % 2 else m.group(1) + '(?:'
 
+        # rules: ['/', '/static', '/func(:param)', '/\\:its/:#.+#/:test/:name#[a-z]+#/']
+        """
+        routes: 
+        {
+        '/\\:its/:#.+#/:test/:name#[a-z]+#/': {'PUT': 10, 'POST': 9, 'ALL': 12, 'HEAD': 11, 'GET': 8}, 
+        '/func(:param)': {'GET': 7}, 
+        '/static': {'ALL': 5, 'GET': 1, 'HEAD': 4, 'PUT': 3, 'POST': 2, 'DELETE': 6}, 
+        '/': {'GET': 0}
+        }
+        """
         for rule in self.rules:
             target = self.routes[rule]
             if not self.syntax.search(rule):
@@ -246,6 +294,10 @@ class Router(object):
             except re.error, e:
                 raise RouteSyntaxError("Could not add Route: %s (%s)" % (rule, e))
 
+    # '/'
+    # '/static'
+    # '/func(:param)'
+    # '/\\:its/:#.+#/:test/:name#[a-z]+#/'
     def _compile_pattern(self, rule):
         ''' Return a regular expression with named groups for each wildcard. '''
         out = ''
@@ -263,63 +315,54 @@ class Router(object):
 if __name__ == '__main__':
     r = Router()
     add = r.add
-    add('/static', 'get', 0)
-    add('/static', 'get', 0)
-    add('/static', 'post', 0)
-    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'get', 0)
-    add('/:test', 'get', 0)
-    add(':test/', 'get', 0)
-    add('/:test/', 'get', 0)
-    add('test', 'get', 0)
-    add(':#anon#/match', 'get', 0)
-    add('/alpha/:abc', 'get', 0)
-    add('/alnum/:md5', 'get', 0)
-    add('/func(:param)', 'get', 0)
-    add('/func2(:param#(foo|bar)#)', 'get', 0)
-    add('/:test/:name#[a-z]+#/', 'get', 0)
-    add('/anon/:#.#', 'get', 0)
 
-    # print r.routes  # {rule: {method: target}}
-    # print r.rules
-    # print r.named
-    # print r.static
-    # print r.dynamic
+    add('/', 'get', 0, name='name0')
+    add('/static', 'get', 1, name='name1')
+    add('/static', 'post', 2, name='name2')
+    add('/static', 'put', 3, name='name3')
+    add('/static', 'head', 4, name='name4')
+    add('/static', 'all', 5, name='name5')
+    add('/static', 'delete', 6, name='name6')
+
+    add('/func(:param)', 'get', 7, name='name7')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'get', 8, name='name8')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'post', 9, name='name9')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'put', 10, name='name10')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'head', 11, name='name11')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'all', 12, name='name12')
+    add('/\\:its/:#.+#/:test/:name#[a-z]+#/', 'delete', 13, name='name13')
+
     """
+    routes: 
     {
-    '/:test': {'GET': 0}, 
-    '/alnum/:md5': {'GET': 0}, 
-    '/\\:its/:#.+#/:test/:name#[a-z]+#/': {'GET': 0}, 
-    '/static': {'POST': 0, 'GET': 0}, 
-    '/alpha/:abc': {'GET': 0}, 
-    '/:test/:name#[a-z]+#/': {'GET': 0}, 
-    '/func(:param)': {'GET': 0}, 
-    ':test/': {'GET': 0}, 
-    ':#anon#/match': {'GET': 0}, 
-    '/func2(:param#(foo|bar)#)': {'GET': 0}, 
-    'test': {'GET': 0}, 
-    '/anon/:#.#': {'GET': 0}, 
-    '/:test/': {'GET': 0}
+    '/\\:its/:#.+#/:test/:name#[a-z]+#/': {'PUT': 10, 'POST': 9, 'ALL': 12, 'HEAD': 11, 'GET': 8}, 
+    '/func(:param)': {'GET': 7}, 
+    '/static': {'ALL': 5, 'GET': 1, 'HEAD': 4, 'PUT': 3, 'POST': 2, 'DELETE': 6}, 
+    '/': {'GET': 0}
     }
     
-    [
-    '/static', 
-    '/\\:its/:#.+#/:test/:name#[a-z]+#/', 
-    '/:test', 
-    ':test/', 
-    '/:test/', 
-    'test', 
-    ':#anon#/match', 
-    '/alpha/:abc', 
-    '/alnum/:md5', 
-    '/func(:param)', 
-    '/func2(:param#(foo|bar)#)', 
-    '/:test/:name#[a-z]+#/', 
-    '/anon/:#.#'
-    ]
-    {}
-    {}
-    []
+    rules: ['/', '/static', '/func(:param)', '/\\:its/:#.+#/:test/:name#[a-z]+#/']
+    
+    named: 
+    {
+    'name10': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name11': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name12': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name6': ('/static', None), 
+    'name7': ('/func(:param)', None), 
+    'name4': ('/static', None), 
+    'name5': ('/static', None), 
+    'name2': ('/static', None), 
+    'name3': ('/static', None), 
+    'name0': ('/', None), 
+    'name1': ('/static', None), 
+    'name8': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None), 
+    'name9': ('/\\:its/:#.+#/:test/:name#[a-z]+#/', None)
+    }
+    
+    static: {}
+    dynamic: []
     """
 
-    env = {'PATH_INFO': '/test', 'REQUEST_METHOD': 'get'}
-    r.match(env)  # (0, {'test': 'test'})
+    env = {'PATH_INFO': '/:its/a/cruel/world/', 'REQUEST_METHOD': 'get'}
+    print r.match(env)  # (8, {'test': 'cruel', 'name': 'world'})
