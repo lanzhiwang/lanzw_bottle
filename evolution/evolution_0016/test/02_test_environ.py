@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
 import unittest
 import sys, os.path
 import bottle
@@ -15,6 +23,7 @@ class TestRequest(unittest.TestCase):
         t['bla/'] = '/bla/'
         t['/bla'] = '/bla'
         t['/bla/'] = '/bla/'
+        # print t  # {'': '/', '/bla/': '/bla/', 'bla': '/bla', '/bla': '/bla', 'bla/': '/bla/'}
         for k, v in t.iteritems():
             request.bind({'PATH_INFO': k})
             self.assertEqual(v, request.path)
@@ -44,12 +53,16 @@ class TestRequest(unittest.TestCase):
         """ Environ: URL building """
         request.bind({'HTTP_HOST':'example.com'})
         self.assertEqual('http://example.com/', request.url)
+
         request.bind({'SERVER_NAME':'example.com'})
         self.assertEqual('http://example.com/', request.url)
+
         request.bind({'SERVER_NAME':'example.com', 'SERVER_PORT':'81'})
         self.assertEqual('http://example.com:81/', request.url)
+
         request.bind({'wsgi.url_scheme':'https', 'SERVER_NAME':'example.com'})
         self.assertEqual('https://example.com:80/', request.url)
+
         request.bind({'HTTP_HOST':'example.com', 'PATH_INFO':'/path', 'QUERY_STRING':'1=b&c=d', 'SCRIPT_NAME':'/sp'})
         self.assertEqual('http://example.com/sp/path?1=b&c=d', request.url)
 
@@ -57,6 +70,25 @@ class TestRequest(unittest.TestCase):
         """ Environ: request objects are environment dicts """
         e = {}
         wsgiref.util.setup_testing_defaults(e)
+        # print e
+        """
+        {
+        'wsgi.multiprocess': 0, 
+        'wsgi.version': (1, 0), 
+        'SERVER_NAME': '127.0.0.1', 
+        'wsgi.run_once': 0, 
+        'wsgi.errors': <StringIO.StringIO instance at 0x1b17488>, 
+        'wsgi.multithread': 0, 
+        'SCRIPT_NAME': '', 
+        'wsgi.url_scheme': 'http', 
+        'wsgi.input': <StringIO.StringIO instance at 0x1b16290>, 
+        'REQUEST_METHOD': 'GET', 
+        'HTTP_HOST': '127.0.0.1', 
+        'PATH_INFO': '/', 
+        'SERVER_PORT': '80', 
+        'SERVER_PROTOCOL': 'HTTP/1.0'
+        }
+        """
         request.bind(e)
         self.assertEqual(list(request), e.keys())
         self.assertEqual(len(request), len(e))
@@ -72,6 +104,25 @@ class TestRequest(unittest.TestCase):
         """ Environ: Request objects decode headers """
         e = {}
         wsgiref.util.setup_testing_defaults(e)
+        # print e
+        """
+        {
+        'wsgi.multiprocess': 0, 
+        'wsgi.version': (1, 0), 
+        'SERVER_NAME': '127.0.0.1', 
+        'wsgi.run_once': 0, 
+        'wsgi.errors': <StringIO.StringIO instance at 0x1b17488>, 
+        'wsgi.multithread': 0, 
+        'SCRIPT_NAME': '', 
+        'wsgi.url_scheme': 'http', 
+        'wsgi.input': <StringIO.StringIO instance at 0x1b16290>, 
+        'REQUEST_METHOD': 'GET', 
+        'HTTP_HOST': '127.0.0.1', 
+        'PATH_INFO': '/', 
+        'SERVER_PORT': '80', 
+        'SERVER_PROTOCOL': 'HTTP/1.0'
+        }
+        """
         e['HTTP_SOME_HEADER'] = 'some value'
         request.bind(e)
         request['HTTP_SOME_OTHER_HEADER'] = 'some other value'
@@ -85,6 +136,7 @@ class TestRequest(unittest.TestCase):
         t['a=a'] = {'a': 'a'}
         t['a=a; b=b'] = {'a': 'a', 'b':'b'}
         t['a=a; a=b'] = {'a': 'b'}
+        # print t  # {'a=a': {'a': 'a'}, 'a=a; b=b': {'a': 'a', 'b': 'b'}, 'a=a; a=b': {'a': 'b'}}
         for k, v in t.iteritems():
             request.bind({'HTTP_COOKIE': k})
             self.assertEqual(v, request.COOKIES)
@@ -104,13 +156,54 @@ class TestRequest(unittest.TestCase):
     def test_post(self):
         """ Environ: POST data """ 
         sq = u'a=a&a=1&b=b&c=&d'.encode('utf8')
+        # print sq
         e = {}
         wsgiref.util.setup_testing_defaults(e)
+        # print sorted(e.items(), key=lambda item:item[1])
+        """
+        [
+        ('wsgi.errors', <StringIO.StringIO instance at 0x14494d0>), 
+        ('wsgi.input', <StringIO.StringIO instance at 0x14496c8>), 
+        ('wsgi.multiprocess', 0), 
+        ('wsgi.run_once', 0), 
+        ('wsgi.multithread', 0), 
+        ('SCRIPT_NAME', ''), 
+        ('PATH_INFO', '/'), 
+        ('SERVER_NAME', '127.0.0.1'), 
+        ('HTTP_HOST', '127.0.0.1'), 
+        ('SERVER_PORT', '80'), 
+        ('REQUEST_METHOD', 'GET'), 
+        ('SERVER_PROTOCOL', 'HTTP/1.0'), 
+        ('wsgi.url_scheme', 'http'), 
+        ('wsgi.version', (1, 0))
+        ]
+        """
         e['wsgi.input'].write(sq)
         e['wsgi.input'].seek(0)
         e['CONTENT_LENGTH'] = str(len(sq))
         e['REQUEST_METHOD'] = "POST"
+        # print sorted(e.items(), key=lambda item:item[1])
+        """
+        [
+        ('wsgi.errors', <StringIO.StringIO instance at 0x14494d0>), 
+        ('wsgi.input', <StringIO.StringIO instance at 0x14496c8>), 
+        ('wsgi.multiprocess', 0), 
+        ('wsgi.run_once', 0), 
+        ('wsgi.multithread', 0), 
+        ('SCRIPT_NAME', ''), 
+        ('PATH_INFO', '/'), 
+        ('SERVER_NAME', '127.0.0.1'), 
+        ('HTTP_HOST', '127.0.0.1'), 
+        ('CONTENT_LENGTH', '16'), 
+        ('SERVER_PORT', '80'), 
+        ('SERVER_PROTOCOL', 'HTTP/1.0'), 
+        ('REQUEST_METHOD', 'POST'), 
+        ('wsgi.url_scheme', 'http'), 
+        ('wsgi.version', (1, 0))
+        ]
+        """
         request.bind(e)
+        # a=a&a=1&b=b&c=&d
         self.assertTrue('a' in request.POST)
         self.assertTrue('b' in request.POST)
         self.assertEqual(['a','1'], request.POST.getall('a'))
@@ -155,6 +248,27 @@ class TestRequest(unittest.TestCase):
         e['QUERY_STRING'] = 'a=a&c=g'
         e['REQUEST_METHOD'] = "POST"
         request.bind(e)
+        # print e
+        """
+        {
+        'CONTENT_LENGTH': '7', 
+        'wsgi.multiprocess': 0, 
+        'wsgi.version': (1, 0), 
+        'SERVER_NAME': '127.0.0.1', 
+        'wsgi.run_once': 0, 
+        'wsgi.errors': <StringIO.StringIO instance at 0x275a488>, 
+        'wsgi.multithread': 0, 
+        'SCRIPT_NAME': '', 
+        'wsgi.url_scheme': 'http', 
+        'wsgi.input': <StringIO.StringIO instance at 0x275a638>, 
+        'REQUEST_METHOD': 'POST', 
+        'HTTP_HOST': '127.0.0.1', 
+        'PATH_INFO': '/', 
+        'SERVER_PORT': '80', 
+        'SERVER_PROTOCOL': 'HTTP/1.0', 
+        'QUERY_STRING': 'a=a&c=g'
+        }
+        """
         self.assertEqual(['a','b','c'], sorted(request.params.keys()))
         self.assertEqual('p', request.params['c'])
 
@@ -211,6 +325,7 @@ class TestRequest(unittest.TestCase):
         self.assertEqual(42, len(request.body.readline()))
         self.assertEqual(42, len(request.body.readline(1024)))
 
+
 class TestResponse(unittest.TestCase):
     def setUp(self):
         response.bind()
@@ -236,8 +351,29 @@ class TestMultipart(unittest.TestCase):
     def test_multipart(self):
         """ Environ: POST (multipart files and multible values per key) """
         fields = [('field1','value1'), ('field2','value2'), ('field2','value3')]
-        files = [('file1','filename1.txt','content1'), ('file2','filename2.py',u'ä\nö\rü')]
+        files = [('file1','filename1.txt','content1'), ('file2','filename2.py', u'ä\nö\rü')]
         e = tools.multipart_environ(fields=fields, files=files)
+        # print e
+        """
+        {
+        'CONTENT_LENGTH': '602', 
+        'wsgi.multiprocess': 0, 
+        'wsgi.version': (1, 0), 
+        'SERVER_PORT': '80', 
+        'SERVER_NAME': '127.0.0.1', 
+        'wsgi.run_once': 0, 
+        'wsgi.errors': <StringIO.StringIO instance at 0x19982d8>, 
+        'wsgi.multithread': 0, 
+        'SCRIPT_NAME': '', 
+        'wsgi.url_scheme': 'http', 
+        'wsgi.input': <StringIO.StringIO instance at 0x1998290>, 
+        'REQUEST_METHOD': 'POST', 
+        'HTTP_HOST': '127.0.0.1', 
+        'PATH_INFO': '/', 
+        'CONTENT_TYPE': 'multipart/form-data; boundary=6e006aec-c64c-11e9-8762-0050569b350e', 
+        'SERVER_PROTOCOL': 'HTTP/1.0'
+        }
+        """
         request.bind(e)
         # File content
         self.assertTrue('file1' in request.POST)

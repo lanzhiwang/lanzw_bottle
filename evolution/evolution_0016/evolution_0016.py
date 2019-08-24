@@ -80,7 +80,7 @@ if sys.version_info >= (3, 0, 0):  # pragma: no cover
 
         def close(self): pass
 
-
+    # touni('foobar')
     def touni(x, enc='utf8'):
         """ Convert anything to unicode """
         return str(x, encoding=enc) if isinstance(x, bytes) else str(x)
@@ -90,12 +90,13 @@ else:
     bytes = str
     NCTextIOWrapper = None
 
-
+    # touni('foobar')
     def touni(x, enc='utf8'):
         """ Convert anything to unicode """
         return x if isinstance(x, unicode) else unicode(str(x), encoding=enc)
 
-
+# tob('b=b&c=p')
+# tob('foobar')
 def tob(data, enc='utf8'):
     """ Convert anything to bytes """
     return data.encode(enc) if isinstance(data, unicode) else bytes(data)
@@ -805,6 +806,7 @@ class Bottle(object):
 # HTTP and WSGI Tools ##########################################################
 ###############################################################################
 
+# DictMixin 测试说明 test_environ.py test_dict_access
 class Request(threading.local, DictMixin):
     """ Represents a single HTTP request using thread-local attributes.
         The Request object wraps a WSGI environment and can be used as such.
@@ -827,8 +829,11 @@ class Request(threading.local, DictMixin):
             instance on every request.
         """
         self.environ = environ
+
         # These attributes are used anyway, so it is ok to compute them here
+        # 测试说明 test_environ.py test_path
         self.path = '/' + environ.get('PATH_INFO', '/').lstrip('/')
+
         self.method = environ.get('REQUEST_METHOD', 'GET').upper()
 
     @property
@@ -840,6 +845,7 @@ class Request(threading.local, DictMixin):
         ''' Returns a copy of self '''
         return Request(self.environ.copy())
 
+    # 测试说明 test_environ.py test_pathshift
     def path_shift(self, shift=1):
         ''' Shift path fragments from PATH_INFO to SCRIPT_NAME and vice versa.
 
@@ -891,6 +897,7 @@ class Request(threading.local, DictMixin):
         """ Request path including SCRIPT_NAME (if present). """
         return self.environ.get('SCRIPT_NAME', '').rstrip('/') + self.path
 
+    # 测试说明 test_environ.py test_url
     @property
     def url(self):
         """ Full URL as requested by the client (computed).
@@ -914,6 +921,7 @@ class Request(threading.local, DictMixin):
         """ Content-Length header as an integer, -1 if not specified """
         return int(self.environ.get('CONTENT_LENGTH', '') or -1)
 
+    # 测试说明 test_environ.py test_header_access
     @property
     def header(self):
         depr("The Request.header property was renamed to Request.headers")
@@ -924,6 +932,7 @@ class Request(threading.local, DictMixin):
         ''' Request HTTP Headers stored in a :cls:`HeaderDict`. '''
         return WSGIHeaderDict(self.environ)
 
+    # 测试说明 test_environ.py test_get test_getpostleak
     @DictProperty('environ', 'bottle.get', read_only=True)
     def GET(self):
         """ The QUERY_STRING parsed into an instance of :class:`MultiDict`. """
@@ -934,6 +943,7 @@ class Request(threading.local, DictMixin):
                 get[key] = value
         return get
 
+    # 测试说明 test_environ.py test_post test_bodypost test_getpostleak test_multipart
     @DictProperty('environ', 'bottle.post', read_only=True)
     def POST(self):
         """ The combined values from :attr:`forms` and :attr:`files`. Values are
@@ -981,6 +991,7 @@ class Request(threading.local, DictMixin):
                 files[name] = item
         return files
 
+    # 测试说明 test_environ.py test_params
     @DictProperty('environ', 'bottle.params', read_only=True)
     def params(self):
         """ A combined :class:`MultiDict` with values from :attr:`forms` and
@@ -1009,6 +1020,7 @@ class Request(threading.local, DictMixin):
         body.seek(0)
         return body
 
+    # 测试说明 test_environ.py test_post test_body_noclose test_body test_bigbody test_tobigbody
     @property
     def body(self):
         self._body.seek(0)
@@ -1023,6 +1035,7 @@ class Request(threading.local, DictMixin):
         """
         return parse_auth(self.headers.get('Authorization', ''))
 
+    # 测试说明 test_environ.py test_cookie
     @DictProperty('environ', 'bottle.cookies', read_only=True)
     def COOKIES(self):
         """ Cookies parsed into a dictionary. Secure cookies are NOT decoded
@@ -1080,6 +1093,7 @@ class Response(threading.local):
         copy.content_type = self.content_type
         return copy
 
+    # 测试说明 test_environ.py test_set_cookie
     def wsgiheader(self):
         ''' Returns a wsgi conform list of header/value pairs. '''
         for c in self.COOKIES.values():
@@ -1115,6 +1129,7 @@ class Response(threading.local):
             self._COOKIES = SimpleCookie()
         return self._COOKIES
 
+    # 测试说明 test_environ.py test_set_cookie
     def set_cookie(self, key, value, secret=None, **kargs):
         ''' Add a cookie. If the `secret` parameter is set, this creates a
             `Secure Cookie` (described below).
@@ -1149,6 +1164,7 @@ class Response(threading.local):
         for k, v in kargs.iteritems():
             self.COOKIES[key][k.replace('_', '-')] = v
 
+    # 测试说明 test_environ.py test_delete_cookie
     def delete_cookie(self, key, **kwargs):
         ''' Delete a cookie. Be sure to use the same `domain` and `path`
             parameters as used to create the cookie. '''
@@ -1242,7 +1258,7 @@ class HeaderDict(MultiDict):
 
     def httpkey(self, key): return str(key).replace('_', '-').title()
 
-
+# 测试说明 test_environ.py TestWSGIHeaderDict
 class WSGIHeaderDict(DictMixin):
     ''' This dict-like class wraps a WSGI environ dict and provides convenient
         access to HTTP_* fields. Keys and values are native strings
