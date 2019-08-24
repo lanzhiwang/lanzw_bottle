@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
 import unittest
 import bottle
 import urllib2
@@ -10,7 +18,7 @@ import signal
 import socket
 from subprocess import Popen, PIPE
 
-serverscript = os.path.join(os.path.dirname(__file__), 'servertest.py')
+serverscript = os.path.join(os.path.dirname(__file__), 'servertest.py')  # servertest.py
 
 def ping(server, port):
     ''' Check if a server accepts connections on a specific TCP port '''
@@ -29,12 +37,14 @@ class TestServer(unittest.TestCase):
         # Find a free port
         for port in range(8800, 8900):
             self.port = port
-            if not ping('127.0.0.1', port): break
+            if not ping('127.0.0.1', port):
+                break
         else:
             raise ValueError("Could not find a free port to test networking.")
         # Start servertest.py in a subprocess
         cmd = [sys.executable, serverscript, self.server, str(self.port)]
         cmd += sys.argv[1:] # pass cmdline arguments to subprocesses
+        print cmd  # ['/root/work/lanzw_frame/evolution/evolution_0016/venv/bin/python', 'servertest.py', 'wsgiref', '8800']
         self.p = Popen(cmd, stdout=PIPE, stderr=PIPE)
         # Wait for the socket to accept connections
         for i in xrange(100):

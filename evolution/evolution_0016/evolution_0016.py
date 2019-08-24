@@ -1860,7 +1860,7 @@ def load_app(target):
     app.remove(tmp)  # Remove the temporary added default application
     return rv if isinstance(rv, Bottle) else tmp
 
-
+# 测试说明 test_server.py
 def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
         interval=1, reloader=False, quiet=False, **kargs):
     """ Start a server instance. This method blocks until the server terminates.

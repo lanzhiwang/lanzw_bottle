@@ -23,9 +23,11 @@ def test():
     return "OK"
 
 # python servertest.py wsgiref 8080 coverage
+# ['/root/work/lanzw_frame/evolution/evolution_0016/venv/bin/python', 'servertest.py', 'wsgiref', '8800']
 if __name__ == '__main__':
     server = sys.argv[1]
     port   = int(sys.argv[2])
+    print sys.argv  # ['servertest.py', 'wsgiref', '8800']
     print server
     print port
     try:
