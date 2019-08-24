@@ -1130,6 +1130,7 @@ class Response(threading.local):
         return self._COOKIES
 
     # 测试说明 test_environ.py test_set_cookie
+    # 测试说明 test_securecookies.py
     def set_cookie(self, key, value, secret=None, **kargs):
         ''' Add a cookie. If the `secret` parameter is set, this creates a
             `Secure Cookie` (described below).
@@ -1440,14 +1441,14 @@ def _lscmp(a, b):
         Runtime is not affected by a common prefix. '''
     return not sum(0 if x == y else 1 for x, y in zip(a, b)) and len(a) == len(b)
 
-
+# 测试说明 test_securecookies.py
 def cookie_encode(data, key):
     ''' Encode and sign a pickle-able object. Return a (byte) string '''
     msg = base64.b64encode(pickle.dumps(data, -1))
     sig = base64.b64encode(hmac.new(key, msg).digest())
     return tob('!') + sig + tob('?') + msg
 
-
+# 测试说明 test_securecookies.py
 def cookie_decode(data, key):
     ''' Verify and decode an encoded string. Return an object or None.'''
     data = tob(data)
@@ -1457,7 +1458,7 @@ def cookie_decode(data, key):
             return pickle.loads(base64.b64decode(msg))
     return None
 
-
+# 测试说明 test_securecookies.py
 def cookie_is_encoded(data):
     ''' Return True if the argument looks like a encoded cookie.'''
     return bool(data.startswith(tob('!')) and tob('?') in data)

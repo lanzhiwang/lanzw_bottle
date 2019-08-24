@@ -1,10 +1,19 @@
+# -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
 import unittest
 import bottle
 from tools import tob
 
 class TestSecureCookies(unittest.TestCase):
     def setUp(self):
-        self.data = dict(a=5, b=u'unicode', c=[1,2,3,4,tob('bytestring')])
+        self.data = dict(a=5, b=u'unicode', c=[1, 2, 3, 4, tob('bytestring')])
         self.key = tob('secret')
 
     def testDeEncode(self):
