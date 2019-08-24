@@ -186,9 +186,10 @@ class HTTPResponse(BottleException):
     def __init__(self, output='', status=200, header=None):
         super(BottleException, self).__init__("HTTP Response %d" % status)
         self.status = int(status)
-        self.output = output
+        self.output = output  # self._cast(out.output, request, response)
         self.headers = HeaderDict(header) if header else None
 
+    # out.apply(response)
     def apply(self, response):
         if self.headers:
             for key, value in self.headers.iterallitems():
@@ -435,18 +436,36 @@ class Bottle(object):
             You usually don't do that. Use `bottle.app.push()` instead.
         """
         self.routes = []  # List of installed routes including metadata.
+        """
+        self.routes.append((func, decorators))
+        # decorators.insert(0, view(template, **template_opts))
+        # decorators = makelist(decorate)
+        # decorators.append(self._add_hook_wrapper)
+        """
+
         self.callbacks = {}  # Cache for wrapped callbacks.
         self.router = Router()  # Maps to self.routes indices.
 
         self.mounts = {}
+
         self.error_handler = {}
-        self.catchall = catchall
+        # self.error_handler[int(code)] = handler
+        # self._cast(self.error_handler.get(out.status, repr)(out), request, response)
+
+        self.catchall = catchall  # 是否捕获所有异常
+
         self.config = config or {}
-        self.serve = True
+
+        self.serve = True  # bool 值，说明服务器端是否正常，run() 有可能设置这个值
+
         self.castfilter = []
+        # for testtype, filterfunc in self.castfilter:
+
         if autojson and json_dumps:
             self.add_filter(dict, dict2json)
+
         self.hooks = {'before_request': [], 'after_request': []}
+        # self.hooks[name].append(func)
 
     def optimize(self, *a, **ka):
         depr("Bottle.optimize() is obsolete.")
@@ -482,12 +501,21 @@ class Bottle(object):
     def match_url(self, path, method='GET'):
         return self.match({'PATH_INFO': path, 'REQUEST_METHOD': method})
 
+    # handler, args = self.match(environ)
     def match(self, environ):
         """ Return a (callback, url-args) tuple or raise HTTPError. """
         target, args = self.router.match(environ)
+        # (8, {'test': 'cruel', 'name': 'world'})
+
         try:
             return self.callbacks[target], args
         except KeyError:
+            """
+            self.routes.append((func, decorators))
+            # decorators.insert(0, view(template, **template_opts))
+            # decorators = makelist(decorate)
+            # decorators.append(self._add_hook_wrapper)
+            """
             callback, decorators = self.routes[target]
             wrapped = callback
             for wrapper in decorators[::-1]:
@@ -566,11 +594,15 @@ class Bottle(object):
                     # TODO: Prepare this for plugins
                     self.router.add(rule, verb, len(self.routes), name=name)
                     self.routes.append((func, decorators))
+                    # decorators.insert(0, view(template, **template_opts))
+                    # decorators = makelist(decorate)
+                    # decorators.append(self._add_hook_wrapper)
             return func
 
         # route(callback=test)
         if callback:
-            return wrapper(callback)
+            func = wrapper(callback)
+            return func
         else:
             return wrapper
         # return wrapper(callback) if callback else wrapper
@@ -580,10 +612,17 @@ class Bottle(object):
 
         @functools.wraps(func)
         def wrapper(*a, **ka):
-            for hook in self.hooks['before_request']: hook()
+            for hook in self.hooks['before_request']:
+                hook()
             response.output = func(*a, **ka)
-            for hook in self.hooks['after_request']: hook()
+
+            for hook in self.hooks['after_request']:
+                hook()
             return response.output
+        """
+        f = functools.wraps(func)
+        wrapper = f(wrapper)
+        """
 
         return wrapper
 
@@ -625,6 +664,7 @@ class Bottle(object):
 
         return wrapper
 
+    # self.add_hook(name, func)
     def add_hook(self, name, func):
         ''' Add a callback from a hook. '''
         if name not in self.hooks:
@@ -640,6 +680,7 @@ class Bottle(object):
             raise ValueError("Unknown hook name %s" % name)
         self.hooks[name].remove(func)
 
+    # out = self.handle(environ)
     def handle(self, environ):
         """ Execute the handler bound to the specified url and method and return
         its output. If catchall is true, exceptions are catched and returned as
@@ -657,6 +698,8 @@ class Bottle(object):
                 raise
             return HTTPError(500, 'Unhandled exception', e, format_exc(10))
 
+    # out = self.handle(environ)
+    # out = self._cast(out, request, response)
     def _cast(self, out, request, response, peek=None):
         """ Try to convert the parameter into something WSGI compatible and set
         correct HTTP headers when possible.
@@ -734,7 +777,8 @@ class Bottle(object):
             out = self._cast(out, request, response)
             # rfc2616 section 4.3
             if response.status in (100, 101, 204, 304) or request.method == 'HEAD':
-                if hasattr(out, 'close'): out.close()
+                if hasattr(out, 'close'):
+                    out.close()
                 out = []
             status = '%d %s' % (response.status, HTTP_CODES[response.status])
             start_response(status, response.headerlist)
@@ -742,7 +786,8 @@ class Bottle(object):
         except (KeyboardInterrupt, SystemExit, MemoryError):
             raise
         except Exception, e:
-            if not self.catchall: raise
+            if not self.catchall:
+                raise
             err = '<h1>Critical error while processing request: %s</h1>' \
                   % environ.get('PATH_INFO', '/')
             if DEBUG:
@@ -773,6 +818,8 @@ class Request(threading.local, DictMixin):
         """
         self.bind(environ or {}, )
 
+    # environ['bottle.app'] = self
+    # request.bind(environ)
     def bind(self, environ):
         """ Bind a new WSGI environment.
 
