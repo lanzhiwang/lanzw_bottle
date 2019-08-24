@@ -1,4 +1,13 @@
 # -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
+
 import bottle
 import threading
 import urllib
@@ -20,10 +29,13 @@ except:
 import mimetypes
 import uuid
 
+# tob('b=b&c=p')
+# tob('foobar')
 def tob(data):
     ''' Transforms bytes or unicode into bytes. '''
     return data.encode('utf8') if isinstance(data, unicode) else data
 
+# tobs('test')
 def tobs(data):
     ''' Transforms bytes or unicode into a byte stream. '''
     return BytesIO(tob(data)) if BytesIO else StringIO(tob(data))
@@ -35,7 +47,10 @@ class ServerTestBase(unittest.TestCase):
         self.host = 'localhost'
         self.app = bottle.app.push()
         self.wsgiapp = wsgiref.validate.validator(self.app)
+        # print 'self.wsgiapp: {}'.format(self.wsgiapp)  # <function lint_app at 0x7fa97b2a8668>
 
+    # urlopen('/cookie')
+    # urlopen(route, **kargs)
     def urlopen(self, path, method='GET', post='', env=None):
         result = {'code':0, 'status':'error', 'header':{}, 'body':tob('')}
         def start_response(status, header):
@@ -97,18 +112,46 @@ class ServerTestBase(unittest.TestCase):
         err = bottle.request.environ['wsgi.errors'].errors.read()
         if search not in err:
             self.fail('The search pattern "%s" is not included in wsgi.error: %s' % (search, err))
-        
+
+
 def multipart_environ(fields, files):
     boundary = str(uuid.uuid1())
+    # print 'boundary: {}'.format(boundary)  # boundary: 8a836306-c65e-11e9-aa5e-0050569b350e
+
     env = {'REQUEST_METHOD':'POST',
            'CONTENT_TYPE':  'multipart/form-data; boundary='+boundary}
     wsgiref.util.setup_testing_defaults(env)
+    # print 'env: {}'.format(env)
+    """
+    {
+    'wsgi.multiprocess': 0, 
+    'wsgi.version': (1, 0), 
+    'SERVER_PORT': '80', 
+    'SERVER_NAME': '127.0.0.1', 
+    'wsgi.run_once': 0, 
+    'wsgi.errors': <StringIO.StringIO instance at 0xf8ca28>, 
+    'wsgi.multithread': 0, 
+    'SCRIPT_NAME': '', 
+    'wsgi.url_scheme': 'http', 
+    'wsgi.input': <StringIO.StringIO instance at 0xf8c9e0>, 
+    'REQUEST_METHOD': 'POST', 
+    'HTTP_HOST': '127.0.0.1', 
+    'PATH_INFO': '/', 
+    'CONTENT_TYPE': 'multipart/form-data; boundary=8a836306-c65e-11e9-aa5e-0050569b350e', 
+    'SERVER_PROTOCOL': 'HTTP/1.0'
+    }
+    """
+
     boundary = '--' + boundary
     body = ''
+
+    # fields = [('field1', 'value1'), ('field2', 'value2'), ('field2', 'value3')]
     for name, value in fields:
         body += boundary + '\n'
         body += 'Content-Disposition: form-data; name="%s"\n\n' % name
         body += value + '\n'
+
+    # files = [('file1', 'filename1.txt', 'content1'), ('file2', 'filename2.py', u'ä\nö\rü')]
     for name, filename, content in files:
         mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         body += boundary + '\n'
@@ -119,7 +162,64 @@ def multipart_environ(fields, files):
     body += boundary + '--\n'
     if hasattr(body, 'encode'):
         body = body.encode('utf8')
+
+    print 'body: {}'.format(body)
+    """
+    --3de250f6-c65f-11e9-8b6b-0050569b350e
+    Content-Disposition: form-data; name="field1"
+    
+    value1
+    --3de250f6-c65f-11e9-8b6b-0050569b350e
+    Content-Disposition: form-data; name="field2"
+    
+    value2
+    --3de250f6-c65f-11e9-8b6b-0050569b350e
+    Content-Disposition: form-data; name="field2"
+    
+    value3
+    --3de250f6-c65f-11e9-8b6b-0050569b350e
+    Content-Disposition: file; name="file1"; filename="filename1.txt"
+    Content-Type: text/plain
+    
+    content1
+    --3de250f6-c65f-11e9-8b6b-0050569b350e
+    Content-Disposition: file; name="file2"; filename="filename2.py"
+    Content-Type: text/x-python
+    
+    ä
+    ü
+    --3de250f6-c65f-11e9-8b6b-0050569b350e--
+
+    """
     env['CONTENT_LENGTH'] = str(len(body))
     env['wsgi.input'].write(body)
     env['wsgi.input'].seek(0)
     return env
+
+
+
+if __name__ == '__main__':
+    fields = [('field1', 'value1'), ('field2', 'value2'), ('field2', 'value3')]
+    files = [('file1', 'filename1.txt', 'content1'), ('file2', 'filename2.py', u'ä\nö\rü')]
+    e = multipart_environ(fields=fields, files=files)
+    print e
+    """
+    {
+    'CONTENT_LENGTH': '602', 
+    'wsgi.multiprocess': 0, 
+    'wsgi.version': (1, 0), 
+    'SERVER_PORT': '80', 
+    'SERVER_NAME': '127.0.0.1', 
+    'wsgi.run_once': 0, 
+    'wsgi.errors': <StringIO.StringIO instance at 0x1fe7a28>, 
+    'wsgi.multithread': 0, 
+    'SCRIPT_NAME': '', 
+    'wsgi.url_scheme': 'http', 
+    'wsgi.input': <StringIO.StringIO instance at 0x1fe79e0>, 
+    'REQUEST_METHOD': 'POST', 
+    'HTTP_HOST': '127.0.0.1', 
+    'PATH_INFO': '/', 
+    'CONTENT_TYPE': 'multipart/form-data; boundary=3de250f6-c65f-11e9-8b6b-0050569b350e', 
+    'SERVER_PROTOCOL': 'HTTP/1.0'
+    }
+    """

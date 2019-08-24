@@ -2443,3 +2443,6 @@ local = threading.local()
 # BC: 0.6.4 and needed for run()
 app = default_app = AppStack()
 app.push()
+# app 测试说明
+# app.push()
+# app.pop()
