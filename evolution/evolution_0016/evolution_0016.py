@@ -1361,7 +1361,7 @@ def send_file(*a, **k):  # BC 0.6.4
     """ Raises the output of static_file(). (deprecated) """
     raise static_file(*a, **k)
 
-
+# 测试说明 test_sendfile.py TestSendFile
 def static_file(filename, root, guessmime=True, mimetype=None, download=False):
     """ Opens a file in a safe way and returns a HTTPError object with status
         code 200, 305, 401 or 404. Sets Content-Type, Content-Length and
@@ -1415,7 +1415,7 @@ def debug(mode=True):
     global DEBUG
     DEBUG = bool(mode)
 
-
+# 测试说明 test_sendfile.py TestDateParser
 def parse_date(ims):
     """ Parse rfc1123, rfc850 and asctime timestamps and return UTC epoch. """
     try:
