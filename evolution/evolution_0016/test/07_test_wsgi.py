@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
 import unittest
 import sys, os.path
 import bottle
