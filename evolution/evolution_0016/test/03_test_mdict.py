@@ -1,3 +1,12 @@
+# -*- coding: utf-8 -*-
+
+import sys, os
+test_root = os.path.dirname(os.path.abspath(__file__))  # /root/work/lanzw_frame/evolution/evolution_0016/test
+os.chdir(test_root)
+# print os.path.dirname(test_root)  # /root/work/lanzw_frame/evolution/evolution_0016
+sys.path.insert(0, os.path.dirname(test_root))
+sys.path.insert(0, test_root)
+
 import unittest
 from bottle import MultiDict, HeaderDict
 
@@ -8,6 +17,9 @@ class TestMultiDict(unittest.TestCase):
         d['key'], m['key'] = 'value', 'value'
         d['k2'], m['k2'] = 'v1', 'v1'
         d['k2'], m['k2'] = 'v2', 'v2'
+        # print d  # {'a': 5, 'k2': 'v2', 'key': 'value'}
+        # print m  # <bottle.MultiDict object at 0x7f9c4aa72590>
+        # {a: 5, key: value, k2: [v1, v2]} 不对
         self.assertEqual(d.keys(), m.keys())
         self.assertEqual(d.values(), m.values())
         self.assertEqual(d.get('key'), m.get('key'))

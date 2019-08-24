@@ -1186,7 +1186,7 @@ class Response(threading.local):
 ###############################################################################
 # Common Utilities #############################################################
 ###############################################################################
-
+# 测试说明 test_mdict.py test_isadict test_ismulti
 class MultiDict(DictMixin):
     """ A dict that remembers old values for each key """
 
@@ -1236,7 +1236,7 @@ class MultiDict(DictMixin):
             for value in values:
                 yield key, value
 
-
+# 测试说明 test_mdict.py test_isheader test_headergetbug
 class HeaderDict(MultiDict):
     """ Same as :class:`MultiDict`, but title()s the keys and overwrites by default. """
 
