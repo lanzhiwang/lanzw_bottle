@@ -24,8 +24,8 @@ class TestWsgi(ServerTestBase):
         """ WSGI: GET routes"""
         @bottle.route('/')
         def test(): return 'test'
-        self.assertStatus(404, '/not/found')
-        self.assertStatus(405, '/', post="var=value")
+        self.assertStatus(404, '/not/found')  # url 找不到
+        self.assertStatus(405, '/', post="var=value")  # 方法不允许
         self.assertBody('test', '/')
 
     def test_post(self):
@@ -43,7 +43,7 @@ class TestWsgi(ServerTestBase):
         @bottle.route('/head', method='HEAD')
         def test2(): return 'test'
         # GET -> HEAD
-        self.assertStatus(405, '/head')
+        self.assertStatus(405, '/head')  # 方法不允许
         # HEAD -> HEAD
         self.assertStatus(200, '/head', method='HEAD')
         self.assertBody('', '/head', method='HEAD')
@@ -58,22 +58,26 @@ class TestWsgi(ServerTestBase):
                'content-type', 'last-modified') # + c-location, expires?
         for h in bad:
             bottle.response.set_header(h, 'foo')
-        bottle.status = 304
+        bottle.status = 304 # todo 错误
         for h, v in bottle.response.headerlist:
             self.assertFalse(h.lower() in bad, "Header %s not deleted" % h)
             
 
     def test_anymethod(self):
+
         self.assertStatus(404, '/any')
+
         @bottle.route('/any', method='ANY')
         def test2(): return 'test'
         self.assertStatus(200, '/any', method='HEAD')
         self.assertBody('test', '/any', method='GET')
         self.assertBody('test', '/any', method='POST')
         self.assertBody('test', '/any', method='DELETE')
+
         @bottle.route('/any', method='GET')
         def test2(): return 'test2'
         self.assertBody('test2', '/any', method='GET')
+
         @bottle.route('/any', method='POST')
         def test2(): return 'test3'
         self.assertBody('test3', '/any', method='POST')
@@ -82,7 +86,7 @@ class TestWsgi(ServerTestBase):
     def test_500(self):
         """ WSGI: Exceptions within handler code (HTTP 500) """
         @bottle.route('/')
-        def test(): return 1/0
+        def test(): return 1/0  # *****
         self.assertStatus(500, '/')
 
     def test_503(self):
@@ -90,15 +94,16 @@ class TestWsgi(ServerTestBase):
         @bottle.route('/')
         def test(): return 'bla'
         self.assertStatus(200, '/')
-        bottle.app().serve = False
+        bottle.app().serve = False  # *****
         self.assertStatus(503, '/')
 
     def test_401(self):
         """ WSGI: abort(401, '') (HTTP 401) """
         @bottle.route('/')
-        def test(): bottle.abort(401)
+        def test(): bottle.abort(401)  # *****
         self.assertStatus(401,'/')
-        @bottle.error(401)
+
+        @bottle.error(401)  # *****
         def err(e):
             bottle.response.status = 200
             return str(type(e))
@@ -108,17 +113,18 @@ class TestWsgi(ServerTestBase):
     def test_303(self):
         """ WSGI: redirect (HTTP 303) """
         @bottle.route('/')
-        def test(): bottle.redirect('/yes')
+        def test(): bottle.redirect('/yes')  # *****
         self.assertStatus(303, '/')
         self.assertHeader('Location', 'http://127.0.0.1/yes', '/')
 
     def test_generator_callback(self):
         @bottle.route('/yield')
-        def test():
+        def test():  # *****
             bottle.response.headers['Test-Header'] = 'test'
             yield 'foo'
+
         @bottle.route('/yield_nothing')
-        def test2():
+        def test2():  # *****
             yield
             bottle.response.headers['Test-Header'] = 'test'
         self.assertBody('foo', '/yield')
@@ -129,7 +135,7 @@ class TestWsgi(ServerTestBase):
     def test_cookie(self):
         """ WSGI: Cookies """
         @bottle.route('/cookie')
-        def test():
+        def test():  # *****
             bottle.response.COOKIES['a']="a"
             bottle.response.set_cookie('b', 'b')
             bottle.response.set_cookie('c', 'c', path='/')
@@ -145,7 +151,8 @@ class TestWsgi(ServerTestBase):
 
 class TestRouteDecorator(ServerTestBase):
     def test_decorators(self):
-        def foo(): return bottle.request.method
+        def foo():
+            return bottle.request.method
         bottle.get('/')(foo)
         bottle.post('/')(foo)
         bottle.put('/')(foo)
@@ -161,20 +168,22 @@ class TestRouteDecorator(ServerTestBase):
 
     def test_path_list(self):
         @bottle.route(['/a','/b'])
-        def test(): return 'ok'
+        def test(): return 'ok'  # *****
         self.assertBody('ok', '/a')
         self.assertBody('ok', '/b')
         self.assertStatus(404, '/c')
 
     def test_no_path(self):
         @bottle.route()
-        def test(x=5): return str(x)
+        def test(x=5):  # *****
+            return str(x)
         self.assertBody('5', '/test')
         self.assertBody('6', '/test/6')
 
     def test_no_params_at_all(self):
         @bottle.route
-        def test(x=5): return str(x)
+        def test(x=5):  # *****
+            return str(x)
         self.assertBody('5', '/test')
         self.assertBody('6', '/test/6')
 
@@ -187,7 +196,8 @@ class TestRouteDecorator(ServerTestBase):
 
     def test_method_list(self):
         @bottle.route(method=['GET','post'])
-        def test(): return 'ok'
+        def test():  # *****
+            return 'ok'
         self.assertBody('ok', '/test', method='GET')
         self.assertBody('ok', '/test', method='POST')
         self.assertStatus(405, '/test', method='PUT')
@@ -200,7 +210,8 @@ class TestRouteDecorator(ServerTestBase):
 
         @bottle.route('/nodec')
         @bottle.route('/dec', decorate=revdec)
-        def test(): return '1', '2'
+        def test():  # *****
+            return '1', '2'
         self.assertBody('21', '/dec')
         self.assertBody('12', '/nodec')
 
@@ -216,7 +227,8 @@ class TestRouteDecorator(ServerTestBase):
 
         @bottle.route('/revtitle', decorate=[revdec, titledec])
         @bottle.route('/titlerev', decorate=[titledec, revdec])
-        def test(): return 'a', 'b', 'c'
+        def test():  # *****
+            return 'a', 'b', 'c'
         self.assertBody('cbA', '/revtitle')
         self.assertBody('Cba', '/titlerev')
 
@@ -224,18 +236,21 @@ class TestRouteDecorator(ServerTestBase):
         @bottle.route()
         def test():
             return bottle.request.environ.get('hooktest','nohooks')
+
         @bottle.hook('before_request')
         def hook():
             bottle.request.environ['hooktest'] = 'before'
+
         @bottle.hook('after_request')
-        def hook():
+        def hook():  # *****
             if isinstance(bottle.response.output, str):
                 bottle.response.output += '-after'
+
         self.assertBody('before-after', '/test')
 
     def test_no_hooks(self):
         @bottle.route(no_hooks=True)
-        def test():
+        def test():  # *****
             return 'nohooks'
         bottle.hook('before_request')(lambda: 1/0)
         bottle.hook('after_request')(lambda: 1/0)
@@ -243,40 +258,51 @@ class TestRouteDecorator(ServerTestBase):
 
     def test_hook_order(self):
         @bottle.route()
-        def test(): return bottle.request.environ.get('hooktest','nohooks')
+        def test():  # *****
+            return bottle.request.environ.get('hooktest','nohooks')
+
         @bottle.hook('before_request')
         def hook(): bottle.request.environ.setdefault('hooktest', []).append('b1')
+
         @bottle.hook('before_request')
         def hook(): bottle.request.environ.setdefault('hooktest', []).append('b2')
+
         @bottle.hook('after_request')
         def hook(): bottle.response.output += 'a1'
+
         @bottle.hook('after_request')
         def hook(): bottle.response.output += 'a2'
+
         self.assertBody('b1b2a2a1', '/test')
 
     def test_template(self):
         @bottle.route(template='test {{a}} {{b}}')
-        def test(): return dict(a=5, b=6)
+        def test():  # *****
+            return dict(a=5, b=6)
         self.assertBody('test 5 6', '/test')
 
     def test_template_opts(self):
         @bottle.route(template='test {{a}} {{b}}', template_opts={'b': 6})
-        def test(): return dict(a=5)
+        def test():  # *****
+            return dict(a=5)
         self.assertBody('test 5 6', '/test')
 
     def test_static(self):
         @bottle.route('/:foo', static=True)
-        def test(): return 'ok'
+        def test():  # *****
+            return 'ok'
         self.assertBody('ok', '/:foo')
 
     def test_name(self):
         @bottle.route(name='foo')
-        def test(x=5): return 'ok'
+        def test(x=5):  # *****
+            return 'ok'
         self.assertEquals('/test/6', bottle.url('foo', x=6))
 
     def test_callback(self):
-        def test(x=5): return str(x)
-        rv = bottle.route(callback=test)
+        def test(x=5):
+            return str(x)
+        rv = bottle.route(callback=test)  # *****
         self.assertBody('5', '/test')
         self.assertBody('6', '/test/6')
         self.assertEqual(rv, test)
@@ -332,15 +358,20 @@ class TestDecorators(ServerTestBase):
 
     def test_routebuild(self):
         """ WSGI: Test route builder """
-        def foo(): pass
+        def foo():
+            pass
         bottle.route('/a/:b/c', name='named')(foo)
+
         bottle.request.environ['SCRIPT_NAME'] = ''
         self.assertEqual('/a/xxx/c', bottle.url('named', b='xxx'))
         self.assertEqual('/a/xxx/c', bottle.app().get_url('named', b='xxx'))
+
         bottle.request.environ['SCRIPT_NAME'] = '/app'
         self.assertEqual('/app/a/xxx/c', bottle.url('named', b='xxx'))
+
         bottle.request.environ['SCRIPT_NAME'] = '/app/'
         self.assertEqual('/app/a/xxx/c', bottle.url('named', b='xxx'))
+
         bottle.request.environ['SCRIPT_NAME'] = 'app/'
         self.assertEqual('/app/a/xxx/c', bottle.url('named', b='xxx'))
 
@@ -364,11 +395,12 @@ class TestAppMounting(ServerTestBase):
         self.subapp = bottle.Bottle()
     
     def test_basicmounting(self):
-        bottle.app().mount(self.subapp, '/test')
+        bottle.app().mount(self.subapp, '/test')  # *****
         self.assertStatus(404, '/')
         self.assertStatus(404, '/test')
         self.assertStatus(404, '/test/')
         self.assertStatus(404, '/test/test/bar')
+
         @self.subapp.route('/')
         @self.subapp.route('/test/:test')
         def test(test='foo'):
