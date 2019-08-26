@@ -8,11 +8,22 @@ __author__ = 'Marcel Hellkamp'
 __version__ = '0.9.dev'
 __license__ = 'MIT'
 
+import threading
+import warnings
+
+
+try:
+    from collections import MutableMapping as DictMixin
+except ImportError: # pragma: no cover
+    from UserDict import DictMixin
 
 
 # Backward compatibility
+# depr("Request._environ renamed to Request.environ")
 def depr(message, critical=False):
-    pass
+    if critical:
+        raise DeprecationWarning(message)
+    warnings.warn(message, DeprecationWarning, stacklevel=3)
 
 
 # Small helpers
@@ -81,7 +92,61 @@ class Bottle(object):
 ###############################################################################
 
 class Request(threading.local, DictMixin):
-    pass
+    def __init__(self, environ=None):
+        self.bind(environ or {}, )
+
+    def bind(self, environ):
+        self.environ = environ
+        # These attributes are used anyway, so it is ok to compute them here
+        self.path = '/' + environ.get('PATH_INFO', '/').lstrip('/')
+        self.method = environ.get('REQUEST_METHOD', 'GET').upper()
+
+    @property
+    def _environ(self):
+        depr("Request._environ renamed to Request.environ")
+        return self.environ
+
+    def copy(self):
+        return Request(self.environ.copy())
+
+    def path_shift(self, shift=1):
+        script_name = self.environ.get('SCRIPT_NAME','/')
+        self['SCRIPT_NAME'], self.path = path_shift(script_name, self.path, shift)
+        self['PATH_INFO'] = self.path
+
+    def __getitem__(self, key):
+        return self.environ[key]
+
+    def __delitem__(self, key):
+        self[key] = ""
+        del(self.environ[key])
+
+    def __iter__(self):
+        return iter(self.environ)
+
+    def __len__(self):
+        return len(self.environ)
+
+    def keys(self):
+        return self.environ.keys()
+
+    def __setitem__(self, key, value):
+        """ Shortcut for Request.environ.__setitem__ """
+        self.environ[key] = value
+        todelete = []
+        if key in ('PATH_INFO','REQUEST_METHOD'):
+            self.bind(self.environ)
+        elif key == 'wsgi.input':
+            todelete = ('body','forms','files','params')
+        elif key == 'QUERY_STRING':
+            todelete = ('get','params')
+        elif key.startswith('HTTP_'):
+            todelete = ('headers', 'cookies')
+
+        for key in todelete:
+            if 'bottle.' + key in self.environ:
+                del self.environ['bottle.' + key]
+
 
 
 class Response(threading.local):
@@ -171,8 +236,38 @@ def yieldroutes(func):
     pass
 
 
+
 def path_shift(script_name, path_info, shift=1):
-    pass
+    if shift == 0:
+        return script_name, path_info
+
+    pathlist = path_info.strip('/').split('/')
+    scriptlist = script_name.strip('/').split('/')
+    if pathlist and pathlist[0] == '':
+        pathlist = []
+    if scriptlist and scriptlist[0] == '':
+        scriptlist = []
+
+    if shift > 0 and shift <= len(pathlist):
+        moved = pathlist[:shift]
+        scriptlist = scriptlist + moved
+        pathlist = pathlist[shift:]
+
+    elif shift < 0 and shift >= -len(scriptlist):
+        moved = scriptlist[shift:]
+        pathlist = moved + pathlist
+        scriptlist = scriptlist[:shift]
+
+    else:
+        empty = 'SCRIPT_NAME' if shift < 0 else 'PATH_INFO'
+        raise AssertionError("Cannot shift. Nothing left from %s" % empty)
+
+    new_script_name = '/' + '/'.join(scriptlist)
+    new_path_info = '/' + '/'.join(pathlist)
+    if path_info.endswith('/') and pathlist:
+        new_path_info += '/'
+    return new_script_name, new_path_info
+
 
 
 # Decorators
