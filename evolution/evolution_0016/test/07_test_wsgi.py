@@ -389,6 +389,7 @@ class TestDecorators(ServerTestBase):
         self.assertEqual(['/e','/e/:x','/e/:x/:y'],list(bottle.yieldroutes(e)))
 
 
+# 没有弄懂
 class TestAppMounting(ServerTestBase):
     def setUp(self):
         ServerTestBase.setUp(self)

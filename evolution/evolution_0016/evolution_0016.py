@@ -501,6 +501,24 @@ class Bottle(object):
         print '/%s/:#.*#' % script_path
         # /test/:#.*#
         # /test/t1/t2/:#.*#
+
+        """
+        http://example.com/sp/path?1=b&c=d
+        {
+        'HTTP_HOST':'example.com', 
+        'PATH_INFO':'/path', 
+        'QUERY_STRING':'1=b&c=d', 
+        'SCRIPT_NAME':'/sp'
+        }
+        
+        path_shift(/sp, /path, 1)
+        {
+        'HTTP_HOST':'example.com', 
+        'PATH_INFO':'/', 
+        'QUERY_STRING':'1=b&c=d', 
+        'SCRIPT_NAME':'/sp/path'
+        }
+        """
         @self.route('/%s/:#.*#' % script_path, method="ANY")
         def mountpoint():
             request.path_shift(path_depth)
@@ -551,6 +569,7 @@ class Bottle(object):
             self.callbacks[target] = wrapped
             return wrapped, args
 
+    # get_url('named', b='xxx')
     def get_url(self, routename, **kargs):
         """ Return a string that matches a named route """
         scriptname = request.environ.get('SCRIPT_NAME', '').strip('/') + '/'
