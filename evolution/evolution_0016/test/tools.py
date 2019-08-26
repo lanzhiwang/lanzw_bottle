@@ -33,12 +33,22 @@ import uuid
 # tob('foobar')
 def tob(data):
     ''' Transforms bytes or unicode into bytes. '''
-    return data.encode('utf8') if isinstance(data, unicode) else data
+    if isinstance(data, unicode):
+        return data.encode('utf8')
+    else:
+        return data
+    # return data.encode('utf8') if isinstance(data, unicode) else data
+
 
 # tobs('test')
 def tobs(data):
     ''' Transforms bytes or unicode into a byte stream. '''
-    return BytesIO(tob(data)) if BytesIO else StringIO(tob(data))
+    if BytesIO:
+        return BytesIO(tob(data))
+    else:
+        return StringIO(tob(data))
+    # return BytesIO(tob(data)) if BytesIO else StringIO(tob(data))
+
 
 class ServerTestBase(unittest.TestCase):
     def setUp(self):
