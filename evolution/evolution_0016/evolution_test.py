@@ -9,11 +9,13 @@ import cgi
 import base64
 import hmac
 import os
+import httplib
 
 from urllib import quote as urlquote
 from urlparse import urlunsplit
 from tempfile import TemporaryFile
 from Cookie import SimpleCookie
+from traceback import format_exc
 
 try:
     from collections import MutableMapping as DictMixin
@@ -24,6 +26,17 @@ try:
     from urlparse import parse_qs
 except ImportError:  # pragma: no cover
     from cgi import parse_qs
+
+try:
+    from json import dumps as json_dumps
+except ImportError:  # pragma: no cover
+    try:
+        from simplejson import dumps as json_dumps
+    except ImportError:  # pragma: no cover
+        try:
+            from django.utils.simplejson import dumps as json_dumps
+        except ImportError:  # pragma: no cover
+            json_dumps = None
 
 try:
     import cPickle as pickle
@@ -69,7 +82,13 @@ else:
     tonat = tob
 tonat.__doc__ = """ Convert anything to native strings """
 
-
+def makelist(data):
+    if isinstance(data, (tuple, list, set, dict)):
+        return list(data)
+    elif data:
+        return [data]
+    else:
+        return []
 
 
 
@@ -357,7 +376,190 @@ class Router(object):
 ###############################################################################
 
 class Bottle(object):
-    pass
+    def __init__(self, catchall=True, autojson=True, config=None):
+        """ Create a new bottle instance.
+            You usually don't do that. Use `bottle.app.push()` instead.
+        """
+        self.routes = []  # List of installed routes including metadata.
+        # self.routes.append((func, decorators))
+
+        self.callbacks = {}  # Cache for wrapped callbacks.
+        self.router = Router()  # Maps to self.routes indices.
+
+        self.mounts = {}
+        self.error_handler = {}
+        self.catchall = catchall
+        self.config = config or {}
+
+        # 路由函数设置
+        self.serve = True
+
+        self.castfilter = []  # [(ftype, func), (ftype, func), ...]
+
+        if autojson and json_dumps:
+            self.add_filter(dict, dict2json)
+
+        self.hooks = {'before_request': [], 'after_request': []}
+
+    # add_filter(dict, dict2json)
+    def add_filter(self, ftype, func):
+        ''' Register a new output filter. Whenever bottle hits a handler output
+            matching `ftype`, `func` is applied to it. '''
+        if not isinstance(ftype, type):
+            raise TypeError("Expected type object, got %s" % type(ftype))
+        self.castfilter = [(t, f) for (t, f) in self.castfilter if t != ftype]
+        self.castfilter.append((ftype, func))
+        self.castfilter.sort()
+
+
+    def match(self, environ):
+        """ Return a (callback, url-args) tuple or raise HTTPError. """
+        target, args = self.router.match(environ)
+        try:
+            return self.callbacks[target], args
+        except KeyError:
+            callback, decorators = self.routes[target]
+            wrapped = callback
+            for wrapper in decorators[::-1]:
+                wrapped = wrapper(wrapped)
+            # for plugin in self.plugins or []:
+            #    wrapped = plugin.apply(wrapped, rule)
+            functools.update_wrapper(wrapped, callback)
+            self.callbacks[target] = wrapped
+            return wrapped, args
+
+
+    def route(self, path=None, method='GET', no_hooks=False, decorate=None,
+              template=None, template_opts={}, callback=None, name=None,
+              static=False):
+
+        # @route can be used without any parameters
+        if callable(path):
+            path, callback = None, path
+
+        # route('/dec', decorate=revdec)
+        # route('/revtitle', decorate=[revdec, titledec])
+        decorators = makelist(decorate)
+
+        # route(template='test {{a}} {{b}}', template_opts={'b': 6})
+        if template:
+            decorators.insert(0, view(template, **template_opts))
+
+        # route(no_hooks=True)
+        if not no_hooks:
+            decorators.append(self._add_hook_wrapper)
+
+        # decorators = [view(template, **template_opts), revdec, titledec, _add_hook_wrapper]
+
+        def wrapper(func):
+            # route(['/a','/b'])
+            for rule in makelist(path) or yieldroutes(func):
+                for verb in makelist(method):
+                    if static:
+                        rule = rule.replace(':', '\\:')
+                        depr("Use backslash to escape ':' in routes.")
+                    # TODO: Prepare this for plugins
+                    self.router.add(rule, verb, len(self.routes), name=name)
+                    self.routes.append((func, decorators))
+            return func
+
+        # bottle.route(callback=test)
+        if callback:
+            return wrapper(callback)
+        else:
+            return wrapper
+
+    # callback
+    # decorators = [view(template, **template_opts), revdec, titledec, _add_hook_wrapper]
+
+    # f1 = _add_hook_wrapper(callback)
+    # f2 = titledec(f1)
+    # f3 = revdec(f2)
+    # f4 = view(f3)
+    def _add_hook_wrapper(self, func):
+        ''' Add hooks to a callable. See #84 '''
+
+        @functools.wraps(func)
+        def wrapper(*a, **ka):
+            for hook in self.hooks['before_request']:
+                hook()
+            response.output = func(*a, **ka)
+            for hook in self.hooks['after_request']:
+                hook()
+            return response.output
+
+        return wrapper
+
+    def get(self, path=None, method='GET', **kargs):
+        """ Decorator: Bind a function to a GET request path.
+            See :meth:'route' for details. """
+        return self.route(path, method, **kargs)
+
+    def post(self, path=None, method='POST', **kargs):
+        """ Decorator: Bind a function to a POST request path.
+            See :meth:'route' for details. """
+        return self.route(path, method, **kargs)
+
+    def put(self, path=None, method='PUT', **kargs):
+        """ Decorator: Bind a function to a PUT request path.
+            See :meth:'route' for details. """
+        return self.route(path, method, **kargs)
+
+    def delete(self, path=None, method='DELETE', **kargs):
+        """ Decorator: Bind a function to a DELETE request path.
+            See :meth:'route' for details. """
+        return self.route(path, method, **kargs)
+
+
+    def handle(self, environ):
+        if not self.serve:
+            return HTTPError(503, "Server stopped")
+        try:
+            handler, args = self.match(environ)
+            return handler(**args)
+        except HTTPResponse, e:
+            return e
+        except Exception, e:
+            if isinstance(e, (KeyboardInterrupt, SystemExit, MemoryError)) \
+                    or not self.catchall:
+                raise
+            return HTTPError(500, 'Unhandled exception', e, format_exc(10))
+
+
+    def wsgi(self, environ, start_response):
+        """ The bottle WSGI-interface. """
+        try:
+            environ['bottle.app'] = self
+            request.bind(environ)
+            response.bind()
+            out = self.handle(environ)
+            out = self._cast(out, request, response)
+            # rfc2616 section 4.3
+            if response.status in (100, 101, 204, 304) or request.method == 'HEAD':
+                if hasattr(out, 'close'):
+                    out.close()
+                out = []
+            status = '%d %s' % (response.status, HTTP_CODES[response.status])
+            start_response(status, response.headerlist)
+            return out
+        except (KeyboardInterrupt, SystemExit, MemoryError):
+            raise
+        except Exception, e:
+            if not self.catchall:
+                raise
+            err = '<h1>Critical error while processing request: %s</h1>' \
+                  % environ.get('PATH_INFO', '/')
+            if DEBUG:
+                err += '<h2>Error:</h2>\n<pre>%s</pre>\n' % repr(e)
+                err += '<h2>Traceback:</h2>\n<pre>%s</pre>\n' % format_exc(10)
+            environ['wsgi.errors'].write(err)  # TODO: wsgi.error should not get html
+            start_response('500 INTERNAL SERVER ERROR', [('Content-Type', 'text/html')])
+            return [tob(err)]
+
+
+    def __call__(self, environ, start_response):
+        return self.wsgi(environ, start_response)
+
 
 
 ###############################################################################
@@ -781,6 +983,9 @@ class WSGIHeaderDict(DictMixin):
 # Application Helper ###########################################################
 ###############################################################################
 
+def dict2json(d):
+    response.content_type = 'application/json'
+    return json_dumps(d)
 
 ###############################################################################
 # HTTP Utilities and MISC (TODO) ###############################################
@@ -846,6 +1051,27 @@ def path_shift(script_name, path_info, shift=1):
     new_path_info = '/' + '/'.join(pathlist)
     if path_info.endswith('/') and pathlist: new_path_info += '/'
     return new_script_name, new_path_info
+
+def yieldroutes(func):
+    """ Return a generator for routes that match the signature (name, args)
+    of the func parameter. This may yield more than one route if the function
+    takes optional keyword arguments. The output is best described by example::
+
+        a()         -> '/a'
+        b(x, y)     -> '/b/:x/:y'
+        c(x, y=5)   -> '/c/:x' and '/c/:x/:y'
+        d(x=5, y=6) -> '/d' and '/d/:x' and '/d/:x/:y'
+    """
+    import inspect  # Expensive module. Only import if necessary.
+    path = '/' + func.__name__.replace('__', '/').lstrip('/')
+    spec = inspect.getargspec(func)
+    argc = len(spec[0]) - len(spec[3] or [])
+    path += ('/:%s' * argc) % tuple(spec[0][:argc])
+    yield path
+    for arg in spec[0][argc:]:
+        path += '/:%s' % arg
+        yield path
+
 
 ###############################################################################
 # Server Adapter ###############################################################
@@ -1443,6 +1669,7 @@ def test_view_decorator(self):
     self.assertEqual(u'start middle end', test())
 """
 def view(tpl_name, **defaults):
+    # f4 = view(f3)
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -1475,6 +1702,15 @@ TEMPLATE_PATH = ['./', './views/']
 TEMPLATES = {}
 DEBUG = False
 MEMFILE_MAX = 1024 * 100
+
+#: A thread-save instance of :class:`Request` representing the `current` request.
+request = Request()
+
+#: A thread-save instance of :class:`Response` used to build the HTTP response.
+response = Response()
+
+HTTP_CODES = httplib.responses
+HTTP_CODES[418] = "I'm a teapot"  # RFC 2324
 
 #: The default template used for error pages. Override with @error()
 ERROR_PAGE_TEMPLATE = """
