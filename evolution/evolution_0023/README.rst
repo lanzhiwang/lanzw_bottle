@@ -33,7 +33,6 @@ Example
 
     run(host='localhost', port=8080)
 
-https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+560&path%5B%5D=bottle.py
+https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+525&path%5B%5D=bottle.py
 
-https://github.com/bottlepy/bottle/commit/3e843442980bf589c9d11d1aa4367e6b858c3a57#diff-ad8cb2f640fd3a70db3fc97f3044a4e6
-
+https://github.com/bottlepy/bottle/commit/a4fa86b053a70745f2e645d1a15b7370caec2b16#diff-ad8cb2f640fd3a70db3fc97f3044a4e6

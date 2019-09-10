@@ -11,7 +11,7 @@ a built-in HTTP Server and adapters for many third party WSGI/HTTP-server and
 template engines - all in a single file and with no dependencies other than the
 Python Standard Library.
 
-Homepage and documentation: http://bottle.paws.de/
+Homepage and documentation: http://bottlepy.org/
 License: MIT (see LICENSE.txt)
 
 Installation and Dependencies
@@ -33,7 +33,6 @@ Example
 
     run(host='localhost', port=8080)
 
-https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+560&path%5B%5D=bottle.py
+https://github.com/bottlepy/bottle/commits/master?before=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+490&path%5B%5D=bottle.py
 
-https://github.com/bottlepy/bottle/commit/3e843442980bf589c9d11d1aa4367e6b858c3a57#diff-ad8cb2f640fd3a70db3fc97f3044a4e6
-
+https://github.com/bottlepy/bottle/commit/ba8ad1a95c103a530f9abfa871816fe9aff0a34c#diff-ad8cb2f640fd3a70db3fc97f3044a4e6
