@@ -41,6 +41,13 @@ def mount(app, script_path):
 
     mounts[script_path] = app
 
+
+def path_shift(self, shift=1):
+    script_name = self.environ.get('SCRIPT_NAME', '/')
+    self['SCRIPT_NAME'], self.path = path_shift(script_name, self.path, shift)
+    self['PATH_INFO'] = self.path
+
+
 subapp = Bottle()
 mount(subapp, '/test')
 

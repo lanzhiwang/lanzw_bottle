@@ -10,6 +10,7 @@ import base64
 import hmac
 import os
 import httplib
+import itertools
 
 from urllib import quote as urlquote
 from urlparse import urlunsplit
@@ -401,6 +402,31 @@ class Bottle(object):
 
         self.hooks = {'before_request': [], 'after_request': []}
 
+
+    # subapp = bottle.Bottle()
+    # mount(subapp, '/test')
+    def mount(self, app, script_path):
+        ''' Mount a Bottle application to a specific URL prefix '''
+        if not isinstance(app, Bottle):
+            raise TypeError('Only Bottle instances are supported for now.')
+        script_path = '/'.join(filter(None, script_path.split('/')))  # 'test'
+        path_depth = script_path.count('/') + 1  # 1
+        if not script_path:
+            raise TypeError('Empty script_path. Perhaps you want a merge()?')
+        for other in self.mounts:
+            if other.startswith(script_path):
+                raise TypeError('Conflict with existing mount: %s' % other)
+
+        @self.route('/%s/:#.*#' % script_path, method="ANY")
+        def mountpoint():
+            request.path_shift(path_depth)
+            return app.handle(request.environ)
+
+        self.mounts[script_path] = app
+
+
+
+
     # add_filter(dict, dict2json)
     def add_filter(self, ftype, func):
         ''' Register a new output filter. Whenever bottle hits a handler output
@@ -525,6 +551,71 @@ class Bottle(object):
                 raise
             return HTTPError(500, 'Unhandled exception', e, format_exc(10))
 
+    def _cast(self, out, request, response, peek=None):
+        # Filtered types (recursive, because they may return anything)
+        for testtype, filterfunc in self.castfilter:
+            if isinstance(out, testtype):
+                return self._cast(filterfunc(out), request, response)
+
+        # Empty output is done here
+        if not out:
+            response.headers['Content-Length'] = 0
+            return []
+
+        # Join lists of byte or unicode strings. Mixed lists are NOT supported
+        # out = [a, b]
+        if isinstance(out, (tuple, list)) and isinstance(out[0], (bytes, unicode)):
+            out = out[0][0:0].join(out)  # b'abc'[0:0] -> b''
+
+        # Encode unicode strings
+        if isinstance(out, unicode):
+            out = out.encode(response.charset)
+
+        # Byte Strings are just returned
+        if isinstance(out, bytes):
+            response.headers['Content-Length'] = str(len(out))
+            return [out]
+
+        # HTTPError or HTTPException (recursive, because they may wrap anything)
+        if isinstance(out, HTTPError):
+            out.apply(response)
+            return self._cast(self.error_handler.get(out.status, repr)(out), request, response)
+        if isinstance(out, HTTPResponse):
+            out.apply(response)
+            return self._cast(out.output, request, response)
+
+        # File-like objects.
+        if hasattr(out, 'read'):
+            if 'wsgi.file_wrapper' in request.environ:
+                return request.environ['wsgi.file_wrapper'](out)
+            elif hasattr(out, 'close') or not hasattr(out, '__iter__'):
+                return WSGIFileWrapper(out)
+
+        # Handle Iterables. We peek into them to detect their inner type.
+        try:
+            out = iter(out)
+            first = out.next()
+            while not first:
+                first = out.next()
+        except StopIteration:
+            return self._cast('', request, response)
+        except HTTPResponse, e:
+            first = e
+        except Exception, e:
+            first = HTTPError(500, 'Unhandled exception', e, format_exc(10))
+            if isinstance(e, (KeyboardInterrupt, SystemExit, MemoryError)) \
+                    or not self.catchall:
+                raise
+        # These are the inner types allowed in iterator or generator objects.
+        if isinstance(first, HTTPResponse):
+            return self._cast(first, request, response)
+        if isinstance(first, bytes):
+            return itertools.chain([first], out)
+        if isinstance(first, unicode):
+            return itertools.imap(lambda x: x.encode(response.charset),
+                                  itertools.chain([first], out))
+        return self._cast(HTTPError(500, 'Unsupported response type: %s' \
+                                    % type(first)), request, response)
 
     def wsgi(self, environ, start_response):
         """ The bottle WSGI-interface. """
@@ -979,6 +1070,39 @@ class WSGIHeaderDict(DictMixin):
         return self._ekey(key) in self.environ
 
 
+
+class WSGIFileWrapper(object):
+
+    def __init__(self, fp, buffer_size=1024 * 64):
+        self.fp, self.buffer_size = fp, buffer_size
+        for attr in ('fileno', 'close', 'read', 'readlines'):
+            if hasattr(fp, attr): setattr(self, attr, getattr(fp, attr))
+
+    def __iter__(self):
+        read, buff = self.fp.read, self.buffer_size
+        while True:
+            part = read(buff)
+            if not part: break
+            yield part
+
+class AppStack(list):
+    """ A stack implementation. """
+
+    def __call__(self):
+        """ Return the current default app. """
+        return self[-1]
+
+    def push(self, value=None):
+        """ Add a new Bottle instance to the stack """
+        if not isinstance(value, Bottle):
+            value = Bottle()
+        self.append(value)
+        return value
+
+
+
+
+
 ###############################################################################
 # Application Helper ###########################################################
 ###############################################################################
@@ -1305,6 +1429,168 @@ server_names = {
 ###############################################################################
 # Application Control ##########################################################
 ###############################################################################
+
+
+def _load(target, **vars):
+    """ Fetch something from a module. The exact behaviour depends on the the
+        target string:
+
+        If the target is a valid python import path (e.g. `package.module`),
+        the rightmost part is returned as a module object.
+        If the target contains a colon (e.g. `package.module:var`) the module
+        variable specified after the colon is returned.
+        If the part after the colon contains any non-alphanumeric characters
+        (e.g. `package.module:func(var)`) the result of the expression
+        is returned. The expression has access to keyword arguments supplied
+        to this function.
+
+        Example::
+        >>> _load('bottle')
+        <module 'bottle' from 'bottle.py'>
+        >>> _load('bottle:Bottle')
+        <class 'bottle.Bottle'>
+        >>> _load('bottle:cookie_encode(v, secret)', v='foo', secret='bar')
+        '!F+hN4dQxaDJ4QxxaZ+Z3jw==?gAJVA2Zvb3EBLg=='
+
+    """
+    module, target = target.split(":", 1) if ':' in target else (target, None)
+    if module not in sys.modules:
+        __import__(module)
+    if not target:
+        return sys.modules[module]
+    if target.isalnum():
+        return getattr(sys.modules[module], target)
+    package_name = module.split('.')[0]
+    vars[package_name] = sys.modules[package_name]
+    return eval('%s.%s' % (module, target), vars)
+
+def load_app(target):
+    """ Load a bottle application based on a target string and return the
+        application object.
+
+        If the target is an import path (e.g. package.module), the application
+        stack is used to isolate the routes defined in that module.
+        If the target contains a colon (e.g. package.module:myapp) the
+        module variable specified after the colon is returned instead.
+    """
+    tmp = app.push()  # Create a new "default application"
+    rv = _load(target)  # Import the target module
+    app.remove(tmp)  # Remove the temporary added default application
+    return rv if isinstance(rv, Bottle) else tmp
+
+
+
+
+def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
+        interval=1, reloader=False, quiet=False, **kargs):
+
+    app = app or default_app()
+
+    if isinstance(app, basestring):
+        app = load_app(app)
+    if isinstance(server, basestring):
+        server = server_names.get(server)
+    if isinstance(server, type):
+        server = server(host=host, port=port, **kargs)
+    if not isinstance(server, ServerAdapter):
+        raise RuntimeError("Server must be a subclass of ServerAdapter")
+    server.quiet = server.quiet or quiet
+    if not server.quiet and not os.environ.get('BOTTLE_CHILD'):
+        print "Bottle server starting up (using %s)..." % repr(server)
+        print "Listening on http://%s:%d/" % (server.host, server.port)
+        print "Use Ctrl-C to quit."
+        print
+    try:
+        if reloader:
+            interval = min(interval, 1)
+            if os.environ.get('BOTTLE_CHILD'):
+                _reloader_child(server, app, interval)
+            else:
+                _reloader_observer(server, app, interval)
+        else:
+            server.run(app)
+    except KeyboardInterrupt:
+        pass
+    if not server.quiet and not os.environ.get('BOTTLE_CHILD'):
+        print "Shutting down..."
+
+class FileCheckerThread(threading.Thread):
+    ''' Thread that periodically checks for changed module files. '''
+
+    def __init__(self, lockfile, interval):
+        threading.Thread.__init__(self)
+        self.lockfile, self.interval = lockfile, interval
+        # 1: lockfile to old; 2: lockfile missing
+        # 3: module file changed; 5: external exit
+        self.status = 0
+
+    def run(self):
+        exists = os.path.exists
+        mtime = lambda path: os.stat(path).st_mtime
+        files = dict()
+        for module in sys.modules.values():
+            path = getattr(module, '__file__', '')
+            if path[-4:] in ('.pyo', '.pyc'): path = path[:-1]
+            if path and exists(path): files[path] = mtime(path)
+        while not self.status:
+            for path, lmtime in files.iteritems():
+                if not exists(path) or mtime(path) > lmtime:
+                    self.status = 3
+            if not exists(self.lockfile):
+                self.status = 2
+            elif mtime(self.lockfile) < time.time() - self.interval - 5:
+                self.status = 1
+            if not self.status:
+                time.sleep(self.interval)
+        if self.status != 5:
+            thread.interrupt_main()
+
+
+def _reloader_child(server, app, interval):
+    ''' Start the server and check for modified files in a background thread.
+        As soon as an update is detected, KeyboardInterrupt is thrown in
+        the main thread to exit the server loop. The process exists with status
+        code 3 to request a reload by the observer process. If the lockfile
+        is not modified in 2*interval second or missing, we assume that the
+        observer process died and exit with status code 1 or 2.
+    '''
+    lockfile = os.environ.get('BOTTLE_LOCKFILE')
+    bgcheck = FileCheckerThread(lockfile, interval)
+    try:
+        bgcheck.start()
+        server.run(app)
+    except KeyboardInterrupt:
+        pass
+    bgcheck.status, status = 5, bgcheck.status
+    bgcheck.join()  # bgcheck.status == 5 --> silent exit
+    if status: sys.exit(status)
+
+
+def _reloader_observer(server, app, interval):
+    ''' Start a child process with identical commandline arguments and restart
+        it as long as it exists with status code 3. Also create a lockfile and
+        touch it (update mtime) every interval seconds.
+    '''
+    fd, lockfile = tempfile.mkstemp(prefix='bottle-reloader.', suffix='.lock')
+    os.close(fd)  # We only need this file to exist. We never write to it
+    try:
+        while os.path.exists(lockfile):
+            args = [sys.executable] + sys.argv
+            environ = os.environ.copy()
+            environ['BOTTLE_CHILD'] = 'true'
+            environ['BOTTLE_LOCKFILE'] = lockfile
+            p = subprocess.Popen(args, env=environ)
+            while p.poll() is None:  # Busy wait...
+                os.utime(lockfile, None)  # I am alive!
+                time.sleep(interval)
+            if p.poll() != 3:
+                if os.path.exists(lockfile): os.unlink(lockfile)
+                sys.exit(p.poll())
+            elif not server.quiet:
+                print "Reloading server..."
+    except KeyboardInterrupt:
+        pass
+    if os.path.exists(lockfile): os.unlink(lockfile)
 
 
 
@@ -1746,3 +2032,5 @@ ERROR_PAGE_TEMPLATE = """
 %end
 """
 
+app = default_app = AppStack()
+app.push()
