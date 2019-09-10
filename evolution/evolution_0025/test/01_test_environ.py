@@ -80,7 +80,16 @@ class TestRequest(unittest.TestCase):
         self.assertEqual('/', BaseRequest({}).script_name)
 
     def test_pathshift(self):
-        """ Request.path_shift() """
+        """ Request.path_shift()
+
+        http://example.com/sp/path?1=b&c=d
+        {
+        'HTTP_HOST':'example.com',
+        'SCRIPT_NAME':'/sp',
+        'PATH_INFO':'/path',
+        'QUERY_STRING':'1=b&c=d'
+        }
+        """
         def test_shift(s, p, c):
             request = BaseRequest({'SCRIPT_NAME': s, 'PATH_INFO': p})
             request.path_shift(c)
