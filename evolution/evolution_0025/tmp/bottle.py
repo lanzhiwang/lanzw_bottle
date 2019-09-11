@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, functools, base64, hmac, pickle, os, re, cgi, warnings, threading, email, time
+import sys, functools, base64, hmac, pickle, os, re, cgi
 
 from unicodedata import normalize
 from tempfile import TemporaryFile
@@ -33,8 +33,6 @@ if py3k:
 
     json_loads = lambda s: json_lds(touni(s))
 
-    unicode = str
-
 else: # 2.x
     from Cookie import SimpleCookie
     from urllib import urlencode, quote as urlquote, unquote as urlunquote
@@ -46,7 +44,6 @@ else: # 2.x
         from collections import MutableMapping as DictMixin
 
     json_loads = json_lds
-    unicode = unicode
 
 
 
@@ -72,10 +69,6 @@ def _e(): return sys.exc_info()[1]
 (None, None, None)
 >>>
 """
-
-
-def depr(message, hard=False):
-    warnings.warn(message, DeprecationWarning, stacklevel=3)
 
 
 class DictProperty(object):
@@ -594,35 +587,6 @@ Request = BaseRequest
 Response = BaseResponse
 
 
-def local_property(name=None):
-    if name:
-        depr('local_property() is deprecated and will be removed.') #0.12
-    ls = threading.local()
-    def fget(self):
-        try:
-            return ls.var
-        except AttributeError:
-            raise RuntimeError("Request context not initialized.")
-
-    def fset(self, value):
-        ls.var = value
-
-    def fdel(self):
-        del ls.var
-
-    return property(fget, fset, fdel, 'Thread-local property')
-
-
-class LocalRequest(BaseRequest):
-    ''' A thread-local subclass of :class:`BaseRequest` with a different
-        set of attributes for each thread. There is usually only one global
-        instance of this class (:data:`request`). If accessed during a
-        request/response cycle, this instance always refers to the *current*
-        request (even on a multithreaded server). '''
-    bind = BaseRequest.__init__
-    environ = local_property()  # property(fget, fset, fdel, 'Thread-local property')
-
-
 class HTTPResponse(Response, BottleException):
     def __init__(self, body='', status=None, headers=None, **more_headers):
         super(HTTPResponse, self).__init__(body, status, headers, **more_headers)
@@ -928,14 +892,6 @@ class FileUpload(object):
 # HTTP Utilities and MISC (TODO) ###############################################
 ###############################################################################
 
-def parse_date(ims):
-    """ Parse rfc1123, rfc850 and asctime timestamps and return UTC epoch. """
-    try:
-        ts = email.utils.parsedate_tz(ims)
-        return time.mktime(ts[:8] + (0,)) - (ts[9] or 0) - time.timezone
-    except (TypeError, ValueError, IndexError, OverflowError):
-        return None
-
 def parse_auth(header):
     """ Parse rfc2617 HTTP authentication header string (basic) and return (user,pass) tuple or None"""
     try:
@@ -1044,7 +1000,6 @@ def path_shift(script_name, path_info, shift=1):
 # Constants and Globals ########################################################
 ###############################################################################
 
-request = LocalRequest()
 
 
 # THE END
