@@ -89,6 +89,22 @@ class TestRequest(unittest.TestCase):
         'PATH_INFO':'/path',
         'QUERY_STRING':'1=b&c=d'
         }
+
+        http://example.com/a/b/c/d?1=b&c=d
+        {
+        'HTTP_HOST':'example.com',
+        'SCRIPT_NAME':'/a/b',
+        'PATH_INFO':'/c/d',
+        'QUERY_STRING':'1=b&c=d'
+        }
+
+        {
+        'HTTP_HOST':'example.com',
+        'SCRIPT_NAME':'/a/b/c',
+        'PATH_INFO':'/d',
+        'QUERY_STRING':'1=b&c=d'
+        }
+
         """
         def test_shift(s, p, c):
             request = BaseRequest({'SCRIPT_NAME': s, 'PATH_INFO': p})
@@ -111,15 +127,20 @@ class TestRequest(unittest.TestCase):
         """ Environ: URL building """
         request = BaseRequest({'HTTP_HOST':'example.com'})
         self.assertEqual('http://example.com/', request.url)
+
         request = BaseRequest({'SERVER_NAME':'example.com'})
         self.assertEqual('http://example.com/', request.url)
+
         request = BaseRequest({'SERVER_NAME':'example.com', 'SERVER_PORT':'81'})
         self.assertEqual('http://example.com:81/', request.url)
+
         request = BaseRequest({'wsgi.url_scheme':'https', 'SERVER_NAME':'example.com'})
         self.assertEqual('https://example.com/', request.url)
+
         request = BaseRequest({'HTTP_HOST':'example.com', 'PATH_INFO':'/path',
                                'QUERY_STRING':'1=b&c=d', 'SCRIPT_NAME':'/sp'})
         self.assertEqual('http://example.com/sp/path?1=b&c=d', request.url)
+
         request = BaseRequest({'HTTP_HOST':'example.com', 'PATH_INFO':'/pa th',
                                'SCRIPT_NAME':'/s p'})
         self.assertEqual('http://example.com/s%20p/pa%20th', request.url)
@@ -128,6 +149,25 @@ class TestRequest(unittest.TestCase):
         """ Environ: request objects are environment dicts """
         e = {}
         wsgiref.util.setup_testing_defaults(e)
+        # print e
+        """
+        {
+        'wsgi.multiprocess': 0, 
+        'wsgi.version': (1, 0), 
+        'SERVER_NAME': '127.0.0.1', 
+        'wsgi.run_once': 0, 
+        'wsgi.errors': <StringIO.StringIO instance at 0x1b17488>, 
+        'wsgi.multithread': 0, 
+        'SCRIPT_NAME': '', 
+        'wsgi.url_scheme': 'http', 
+        'wsgi.input': <StringIO.StringIO instance at 0x1b16290>, 
+        'REQUEST_METHOD': 'GET', 
+        'HTTP_HOST': '127.0.0.1', 
+        'PATH_INFO': '/', 
+        'SERVER_PORT': '80', 
+        'SERVER_PROTOCOL': 'HTTP/1.0'
+        }
+        """
         request = BaseRequest(e)
         self.assertEqual(list(request), list(e.keys()))
         self.assertEqual(len(request), len(e))
@@ -139,11 +179,13 @@ class TestRequest(unittest.TestCase):
         del request['PATH_INFO']
         self.assertTrue('PATH_INFO' not in request)
 
+    # todo
     def test_readonly_environ(self):
         request = BaseRequest({'bottle.request.readonly':True})
         def test(): request['x']='y'
         self.assertRaises(KeyError, test)
 
+    # todo
     def test_header_access(self):
         """ Environ: Request objects decode headers """
         e = {}
