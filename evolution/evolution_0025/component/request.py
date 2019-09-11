@@ -33,7 +33,7 @@ if py3k:
 
     json_loads = lambda s: json_lds(touni(s))
 
-    unicode = strs
+    unicode = str
 
 else: # 2.x
     from Cookie import SimpleCookie
