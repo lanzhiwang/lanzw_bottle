@@ -4,6 +4,8 @@ import sys, functools, base64, hmac, pickle, os, re, cgi, warnings, threading, e
 
 from unicodedata import normalize
 from tempfile import TemporaryFile
+from datetime import date as datedate, datetime, timedelta
+
 
 try: from simplejson import dumps as json_dumps, loads as json_lds
 except ImportError: # pragma: no cover
@@ -26,6 +28,7 @@ if py3k:
     from http.cookies import SimpleCookie
     from collections import MutableMapping as DictMixin
     from io import BytesIO
+    import http.client as httplib
 
     from urllib.parse import urlencode, quote as urlquote, unquote as urlunquote
 
@@ -36,6 +39,7 @@ if py3k:
     unicode = str
 
 else: # 2.x
+    import httplib
     from Cookie import SimpleCookie
     from urllib import urlencode, quote as urlquote, unquote as urlunquote
     from StringIO import StringIO as BytesIO
@@ -550,6 +554,8 @@ class BaseRequest(object):
 
 
 
+
+
 def _hkey(key):
     if '\n' in key or '\r' in key or '\0' in key:
         raise ValueError("Header names must not contain control characters: %r" % key)
@@ -584,6 +590,186 @@ class HeaderProperty(object):
 
     def __delete__(self, obj):
         del obj[self.name]
+
+
+class BaseResponse(object):
+    default_status = 200
+    default_content_type = 'text/html; charset=UTF-8'
+
+    # Header blacklist for specific response codes
+    # (rfc2616 section 10.2.3 and 10.3.5)
+    bad_headers = {
+        204: set(('Content-Type',)),
+        304: set(('Allow', 'Content-Encoding', 'Content-Language',
+                  'Content-Length', 'Content-Range', 'Content-Type',
+                  'Content-Md5', 'Last-Modified'))}
+
+    def __init__(self, body='', status=None, headers=None, **more_headers):
+        self._cookies = None
+        self._headers = {}
+        self.body = body
+        self.status = status or self.default_status
+        if headers:
+            if isinstance(headers, dict):
+                headers = headers.items()
+            for name, value in headers:
+                self.add_header(name, value)
+
+        if more_headers:
+            for name, value in more_headers.items():
+                self.add_header(name, value)
+
+    def copy(self, cls=None):
+        ''' Returns a copy of self. '''
+        cls = cls or BaseResponse
+        assert issubclass(cls, BaseResponse)
+        copy = cls()
+        copy.status = self.status
+        copy._headers = dict((k, v[:]) for (k, v) in self._headers.items())
+        if self._cookies:
+            copy._cookies = SimpleCookie()
+            copy._cookies.load(self._cookies.output(header=''))
+        return copy
+
+    def __iter__(self):
+        return iter(self.body)
+
+    def close(self):
+        if hasattr(self.body, 'close'):
+            self.body.close()
+
+    @property
+    def status_line(self):
+        ''' The HTTP status line as a string (e.g. ``404 Not Found``).'''
+        return self._status_line
+
+    @property
+    def status_code(self):
+        ''' The HTTP status code as an integer (e.g. 404).'''
+        return self._status_code
+
+    def _set_status(self, status):
+        if isinstance(status, int):
+            code, status = status, _HTTP_STATUS_LINES.get(status)
+        elif ' ' in status:
+            status = status.strip()
+            code = int(status.split()[0])
+        else:
+            raise ValueError('String status line without a reason phrase.')
+        if not 100 <= code <= 999:
+            raise ValueError('Status code out of range.')
+        self._status_code = code
+        self._status_line = str(status or ('%d Unknown' % code))
+
+    def _get_status(self):
+        return self._status_line
+
+    status = property(_get_status, _set_status, None,
+                      ''' A writeable property to change the HTTP response status. It accepts
+                          either a numeric code (100-999) or a string with a custom reason
+                          phrase (e.g. "404 Brain not found"). Both :data:`status_line` and
+                          :data:`status_code` are updated accordingly. The return value is
+                          always a status string. ''')
+
+    del _get_status, _set_status
+
+    @property
+    def headers(self):
+        ''' An instance of :class:`HeaderDict`, a case-insensitive dict-like
+            view on the response headers. '''
+        hdict = HeaderDict()
+        hdict.dict = self._headers
+        return hdict
+
+    def __contains__(self, name):
+        return _hkey(name) in self._headers
+
+    def __delitem__(self, name):
+        del self._headers[_hkey(name)]
+
+    def __getitem__(self, name):
+        return self._headers[_hkey(name)][-1]
+
+    def __setitem__(self, name, value):
+        self._headers[_hkey(name)] = [_hval(value)]
+
+    def get_header(self, name, default=None):
+        return self._headers.get(_hkey(name), [default])[-1]
+
+    def set_header(self, name, value):
+        self._headers[_hkey(name)] = [_hval(value)]
+
+    def add_header(self, name, value):
+        self._headers.setdefault(_hkey(name), []).append(_hval(value))
+
+    def iter_headers(self):
+        return self.headerlist
+
+    @property
+    def headerlist(self):
+        """ WSGI conform list of (header, value) tuples. """
+        out = []
+        headers = list(self._headers.items())
+        if 'Content-Type' not in self._headers:
+            headers.append(('Content-Type', [self.default_content_type]))
+        if self._status_code in self.bad_headers:
+            bad_headers = self.bad_headers[self._status_code]
+            headers = [h for h in headers if h[0] not in bad_headers]
+        out += [(name, val) for (name, vals) in headers for val in vals]
+        if self._cookies:
+            for c in self._cookies.values():
+                out.append(('Set-Cookie', _hval(c.OutputString())))
+        if py3k:
+            out = [(k, v.encode('utf8').decode('latin1')) for (k, v) in out]
+        return out
+
+    content_type = HeaderProperty('Content-Type')
+    content_length = HeaderProperty('Content-Length', reader=int)
+    expires = HeaderProperty('Expires',
+                             reader=lambda x: datetime.utcfromtimestamp(parse_date(x)),
+                             writer=lambda x: http_date(x))
+
+    @property
+    def charset(self, default='UTF-8'):
+        """ Return the charset specified in the content-type header (default: utf8). """
+        if 'charset=' in self.content_type:
+            return self.content_type.split('charset=')[-1].split(';')[0].strip()
+        return default
+
+    def set_cookie(self, name, value, secret=None, **options):
+        if not self._cookies:
+            self._cookies = SimpleCookie()
+
+        if secret:
+            value = touni(cookie_encode((name, value), secret))
+        elif not isinstance(value, basestring):
+            raise TypeError('Secret key missing for non-string Cookie.')
+
+        if len(value) > 4096: raise ValueError('Cookie value to long.')
+        self._cookies[name] = value
+
+        for key, value in options.items():
+            if key == 'max_age':
+                if isinstance(value, timedelta):
+                    value = value.seconds + value.days * 24 * 3600
+            if key == 'expires':
+                if isinstance(value, (datedate, datetime)):
+                    value = value.timetuple()
+                elif isinstance(value, (int, float)):
+                    value = time.gmtime(value)
+                value = time.strftime("%a, %d %b %Y %H:%M:%S GMT", value)
+            self._cookies[name][key.replace('_', '-')] = value
+
+    def delete_cookie(self, key, **kwargs):
+        kwargs['max_age'] = -1
+        kwargs['expires'] = 0
+        self.set_cookie(key, '', **kwargs)
+
+    def __repr__(self):
+        out = ''
+        for name, value in self.headerlist:
+            out += '%s: %s\n' % (name.title(), value.strip())
+        return out
 
 
 class BaseResponse(object):
@@ -936,6 +1122,15 @@ def parse_date(ims):
     except (TypeError, ValueError, IndexError, OverflowError):
         return None
 
+def http_date(value):
+    if isinstance(value, (datedate, datetime)):
+        value = value.utctimetuple()
+    elif isinstance(value, (int, float)):
+        value = time.gmtime(value)
+    if not isinstance(value, basestring):
+        value = time.strftime("%a, %d %b %Y %H:%M:%S GMT", value)
+    return value
+
 def parse_auth(header):
     """ Parse rfc2617 HTTP authentication header string (basic) and return (user,pass) tuple or None"""
     try:
@@ -1043,6 +1238,15 @@ def path_shift(script_name, path_info, shift=1):
 ###############################################################################
 # Constants and Globals ########################################################
 ###############################################################################
+
+HTTP_CODES = httplib.responses
+HTTP_CODES[418] = "I'm a teapot" # RFC 2324
+HTTP_CODES[422] = "Unprocessable Entity" # RFC 4918
+HTTP_CODES[428] = "Precondition Required"
+HTTP_CODES[429] = "Too Many Requests"
+HTTP_CODES[431] = "Request Header Fields Too Large"
+HTTP_CODES[511] = "Network Authentication Required"
+_HTTP_STATUS_LINES = dict((k, '%d %s'%(k,v)) for (k,v) in HTTP_CODES.items())
 
 request = LocalRequest()
 
