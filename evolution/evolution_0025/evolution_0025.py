@@ -772,8 +772,6 @@ class BaseResponse(object):
         return out
 
 
-class BaseResponse(object):
-    pass
 
 
 Request = BaseRequest

@@ -772,8 +772,6 @@ class BaseResponse(object):
         return out
 
 
-class BaseResponse(object):
-    pass
 
 
 Request = BaseRequest
@@ -808,6 +806,18 @@ class LocalRequest(BaseRequest):
     bind = BaseRequest.__init__
     environ = local_property()  # property(fget, fset, fdel, 'Thread-local property')
 
+class LocalResponse(BaseResponse):
+    ''' A thread-local subclass of :class:`BaseResponse` with a different
+        set of attributes for each thread. There is usually only one global
+        instance of this class (:data:`response`). Its attributes are used
+        to build the HTTP response at the end of the request/response cycle.
+    '''
+    bind = BaseResponse.__init__
+    _status_line = local_property()
+    _status_code = local_property()
+    _cookies     = local_property()
+    _headers     = local_property()
+    body         = local_property()
 
 class HTTPResponse(Response, BottleException):
     def __init__(self, body='', status=None, headers=None, **more_headers):
