@@ -150,7 +150,9 @@ class BottleException(Exception):
 # Routing ######################################################################
 ###############################################################################
 
-
+class Router(object):
+    default_pattern = '[^/]+'
+    default_filter = 're'
 
 
 
