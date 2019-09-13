@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, functools, base64, hmac, pickle, os, re, cgi, warnings, threading, email, time
+import sys, functools, base64, hmac, pickle, os, re, cgi, warnings, threading, email.utils, time
 
 from unicodedata import normalize
 from tempfile import TemporaryFile
@@ -569,19 +569,17 @@ def _hval(value):
     return value
 
 
+
+
+
 class HeaderProperty(object):
-    # content_type = HeaderProperty('Content-Type')
-    # content_length = HeaderProperty('Content-Length', reader=int, default=-1)
     def __init__(self, name, reader=None, writer=None, default=''):
-        self.name = name
-        self.default = default
-        self.reader = reader
-        self.reader = writer
+        self.name, self.default = name, default
+        self.reader, self.writer = reader, writer
         self.__doc__ = 'Current value of the %r header.' % name.title()
 
     def __get__(self, obj, cls):
-        if obj is None:
-            return self
+        if obj is None: return self
         value = obj.get_header(self.name, self.default)
         return self.reader(value) if self.reader else value
 
@@ -590,6 +588,9 @@ class HeaderProperty(object):
 
     def __delete__(self, obj):
         del obj[self.name]
+
+
+
 
 
 class BaseResponse(object):
@@ -1116,13 +1117,23 @@ class FileUpload(object):
 # Application Helper ###########################################################
 ###############################################################################
 
-
+def redirect(url, code=None):
+    """ Aborts execution and causes a 303 or 302 redirect, depending on
+        the HTTP protocol version. """
+    if not code:
+        code = 303 if request.get('SERVER_PROTOCOL') == "HTTP/1.1" else 302
+    res = response.copy(cls=HTTPResponse)
+    res.status = code
+    res.body = ""
+    res.set_header('Location', urljoin(request.url, url))
+    raise res
 
 
 
 ###############################################################################
 # HTTP Utilities and MISC (TODO) ###############################################
 ###############################################################################
+
 
 def parse_date(ims):
     """ Parse rfc1123, rfc850 and asctime timestamps and return UTC epoch. """
@@ -1131,6 +1142,9 @@ def parse_date(ims):
         return time.mktime(ts[:8] + (0,)) - (ts[9] or 0) - time.timezone
     except (TypeError, ValueError, IndexError, OverflowError):
         return None
+
+
+
 
 def http_date(value):
     if isinstance(value, (datedate, datetime)):
@@ -1259,6 +1273,7 @@ HTTP_CODES[511] = "Network Authentication Required"
 _HTTP_STATUS_LINES = dict((k, '%d %s'%(k,v)) for (k,v) in HTTP_CODES.items())
 
 request = LocalRequest()
+response = LocalResponse()
 
 
 # THE END
