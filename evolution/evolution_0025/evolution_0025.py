@@ -527,11 +527,15 @@ class Bottle(object):
         self.resources = ResourceManager()
 
         self.routes = [] # List of installed :class:`Route` instances.
+        # self.routes.append(route)
+
         self.router = Router() # Maps requests to :class:`Route` instances.
         self.error_handler = {}
 
         # Core plugins
         self.plugins = [] # List of installed plugins.
+        # self.plugins.append(plugin)
+
         if self.config['autojson']:
             self.install(JSONPlugin())
         self.install(TemplatePlugin())
@@ -639,11 +643,8 @@ class Bottle(object):
             self.add_route(route)
 
     def install(self, plugin):
-        ''' Add a plugin to the list of plugins and prepare it for being
-            applied to all routes of this application. A plugin may be a simple
-            decorator or an object that implements the :class:`Plugin` API.
-        '''
-        if hasattr(plugin, 'setup'): plugin.setup(self)
+        if hasattr(plugin, 'setup'):
+            plugin.setup(self)
         if not callable(plugin) and not hasattr(plugin, 'apply'):
             raise TypeError("Plugins must be callable or implement .apply()")
         self.plugins.append(plugin)
@@ -651,30 +652,30 @@ class Bottle(object):
         return plugin
 
     def uninstall(self, plugin):
-        ''' Uninstall plugins. Pass an instance to remove a specific plugin, a type
-            object to remove all plugins that match that type, a string to remove
-            all plugins with a matching ``name`` attribute or ``True`` to remove all
-            plugins. Return the list of removed plugins. '''
         removed, remove = [], plugin
         for i, plugin in list(enumerate(self.plugins))[::-1]:
             if remove is True or remove is plugin or remove is type(plugin) \
             or getattr(plugin, 'name', True) == remove:
                 removed.append(plugin)
                 del self.plugins[i]
-                if hasattr(plugin, 'close'): plugin.close()
-        if removed: self.reset()
+                if hasattr(plugin, 'close'):
+                    plugin.close()
+        if removed:
+            self.reset()
         return removed
 
     def reset(self, route=None):
-        ''' Reset all routes (force plugins to be re-applied) and clear all
-            caches. If an ID or route object is given, only that specific route
-            is affected. '''
-        if route is None: routes = self.routes
-        elif isinstance(route, Route): routes = [route]
-        else: routes = [self.routes[route]]
-        for route in routes: route.reset()
+        if route is None:
+            routes = self.routes
+        elif isinstance(route, Route):
+            routes = [route]
+        else:
+            routes = [self.routes[route]]
+        for route in routes:
+            route.reset()
         if DEBUG:
-            for route in routes: route.prepare()
+            for route in routes:
+                route.prepare()
         self.trigger_hook('app_reset')
 
     def close(self):
@@ -699,46 +700,23 @@ class Bottle(object):
         location = self.router.build(routename, **kargs).lstrip('/')
         return urljoin(urljoin('/', scriptname), location)
 
+    # self.add_route(route)
     def add_route(self, route):
-        ''' Add a route object, but do not change the :data:`Route.app`
-            attribute.'''
         self.routes.append(route)
         self.router.add(route.rule, route.method, route, name=route.name)
-        if DEBUG: route.prepare()
+        if DEBUG:
+            route.prepare()
 
     def route(self, path=None, method='GET', callback=None, name=None,
               apply=None, skip=None, **config):
-        """ A decorator to bind a function to a request URL. Example::
-
-                @app.route('/hello/:name')
-                def hello(name):
-                    return 'Hello %s' % name
-
-            The ``:name`` part is a wildcard. See :class:`Router` for syntax
-            details.
-
-            :param path: Request path or a list of paths to listen to. If no
-              path is specified, it is automatically generated from the
-              signature of the function.
-            :param method: HTTP method (`GET`, `POST`, `PUT`, ...) or a list of
-              methods to listen to. (default: `GET`)
-            :param callback: An optional shortcut to avoid the decorator
-              syntax. ``route(..., callback=func)`` equals ``route(...)(func)``
-            :param name: The name for this route. (default: None)
-            :param apply: A decorator or plugin or a list of plugins. These are
-              applied to the route callback in addition to installed plugins.
-            :param skip: A list of plugins, plugin classes or names. Matching
-              plugins are not installed to this route. ``True`` skips all.
-
-            Any additional keyword arguments are stored as route-specific
-            configuration and passed to plugins (see :meth:`Plugin.apply`).
-        """
-        if callable(path): path, callback = None, path
+        if callable(path):
+            path, callback = None, path
         plugins = makelist(apply)
         skiplist = makelist(skip)
         def decorator(callback):
             # TODO: Documentation and tests
-            if isinstance(callback, basestring): callback = load(callback)
+            if isinstance(callback, basestring):
+                callback = load(callback)
             for rule in makelist(path) or yieldroutes(callback):
                 for verb in makelist(method):
                     verb = verb.upper()
@@ -746,7 +724,12 @@ class Bottle(object):
                                   plugins=plugins, skiplist=skiplist, **config)
                     self.add_route(route)
             return callback
-        return decorator(callback) if callback else decorator
+
+        if callback:
+            return decorator(callback)
+        else:
+            return decorator
+        # return decorator(callback) if callback else decorator
 
     def get(self, path=None, method='GET', **options):
         """ Equals :meth:`route`. """
@@ -2209,6 +2192,20 @@ class _closeiter(object):
             func()
 
 
+class AppStack(list):
+    """ A stack-like list. Calling it returns the head of the stack. """
+
+    def __call__(self):
+        """ Return the current default application. """
+        return self[-1]
+
+    def push(self, value=None):
+        """ Add a new :class:`Bottle` instance to the stack """
+        if not isinstance(value, Bottle):
+            value = Bottle()
+        self.append(value)
+        return value
+
 
 ###############################################################################
 # Application Helper ###########################################################
@@ -2376,6 +2373,8 @@ def html_escape(string):
 # Application Control ##########################################################
 ###############################################################################
 
+
+
 def load(target, **namespace):
     """ Import a module or fetch an object from a module.
 
@@ -2411,10 +2410,127 @@ def load_app(target):
 
 _debug = debug
 
+
 def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
         interval=1, reloader=False, quiet=False, plugins=None,
         debug=None, **kargs):
-    pass
+    if NORUN:
+        return
+    if reloader and not os.environ.get('BOTTLE_CHILD'):
+        try:
+            lockfile = None
+            fd, lockfile = tempfile.mkstemp(prefix='bottle.', suffix='.lock')
+            os.close(fd) # We only need this file to exist. We never write to it
+            while os.path.exists(lockfile):
+                args = [sys.executable] + sys.argv
+                environ = os.environ.copy()
+                environ['BOTTLE_CHILD'] = 'true'
+                environ['BOTTLE_LOCKFILE'] = lockfile
+                p = subprocess.Popen(args, env=environ)
+                while p.poll() is None: # Busy wait...
+                    os.utime(lockfile, None) # I am alive!
+                    time.sleep(interval)
+                if p.poll() != 3:
+                    if os.path.exists(lockfile): os.unlink(lockfile)
+                    sys.exit(p.poll())
+        except KeyboardInterrupt:
+            pass
+        finally:
+            if os.path.exists(lockfile):
+                os.unlink(lockfile)
+        return
+
+    try:
+        if debug is not None:
+            _debug(debug)
+        app = app or default_app()
+        if isinstance(app, basestring):
+            app = load_app(app)
+        if not callable(app):
+            raise ValueError("Application is not callable: %r" % app)
+
+        for plugin in plugins or []:
+            app.install(plugin)
+
+        if server in server_names:
+            server = server_names.get(server)
+        if isinstance(server, basestring):
+            server = load(server)
+        if isinstance(server, type):
+            server = server(host=host, port=port, **kargs)
+        if not isinstance(server, ServerAdapter):
+            raise ValueError("Unknown or unsupported server: %r" % server)
+
+        server.quiet = server.quiet or quiet
+        if not server.quiet:
+            _stderr("Bottle v%s server starting up (using %s)...\n" % (__version__, repr(server)))
+            _stderr("Listening on http://%s:%d/\n" % (server.host, server.port))
+            _stderr("Hit Ctrl-C to quit.\n\n")
+
+        if reloader:
+            lockfile = os.environ.get('BOTTLE_LOCKFILE')
+            bgcheck = FileCheckerThread(lockfile, interval)
+            with bgcheck:
+                server.run(app)
+            if bgcheck.status == 'reload':
+                sys.exit(3)
+        else:
+            server.run(app)
+    except KeyboardInterrupt:
+        pass
+    except (SystemExit, MemoryError):
+        raise
+    except:
+        if not reloader: raise
+        if not getattr(server, 'quiet', quiet):
+            print_exc()
+        time.sleep(interval)
+        sys.exit(3)
+
+
+
+class FileCheckerThread(threading.Thread):
+    ''' Interrupt main-thread as soon as a changed module file is detected,
+        the lockfile gets deleted or gets to old. '''
+
+    def __init__(self, lockfile, interval):
+        threading.Thread.__init__(self)
+        self.lockfile, self.interval = lockfile, interval
+        #: Is one of 'reload', 'error' or 'exit'
+        self.status = None
+
+    def run(self):
+        exists = os.path.exists
+        mtime = lambda path: os.stat(path).st_mtime
+        files = dict()
+
+        for module in list(sys.modules.values()):
+            path = getattr(module, '__file__', '') or ''
+            if path[-4:] in ('.pyo', '.pyc'): path = path[:-1]
+            if path and exists(path): files[path] = mtime(path)
+
+        while not self.status:
+            if not exists(self.lockfile)\
+            or mtime(self.lockfile) < time.time() - self.interval - 5:
+                self.status = 'error'
+                thread.interrupt_main()
+            for path, lmtime in list(files.items()):
+                if not exists(path) or mtime(path) > lmtime:
+                    self.status = 'reload'
+                    thread.interrupt_main()
+                    break
+            time.sleep(self.interval)
+
+    def __enter__(self):
+        self.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self.status: self.status = 'exit' # silent exit
+        self.join()
+        return exc_type is not None and issubclass(exc_type, KeyboardInterrupt)
+
+
+
 
 
 ###############################################################################
@@ -2431,6 +2547,9 @@ def run(app=None, server='wsgiref', host='127.0.0.1', port=8080,
 # Constants and Globals ########################################################
 ###############################################################################
 
+app = default_app = AppStack()
+app.push()
+
 HTTP_CODES = httplib.responses
 HTTP_CODES[418] = "I'm a teapot" # RFC 2324
 HTTP_CODES[422] = "Unprocessable Entity" # RFC 4918
@@ -2444,6 +2563,7 @@ request = LocalRequest()
 response = LocalResponse()
 
 DEBUG = False
+NORUN = False # If set, run() does nothing. Used by load_app()
 
 ERROR_PAGE_TEMPLATE = """
 %%try:
