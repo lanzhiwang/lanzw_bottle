@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+__version__ = '0.12.17'
+
+
 import sys, functools, base64, hmac, pickle, os, re, cgi, warnings, threading, email.utils, time, \
     itertools
 
@@ -442,10 +446,14 @@ class Route(object):
         ''' Yield all Plugins affecting this route. '''
         unique = set()
         for p in reversed(self.app.plugins + self.plugins):
-            if True in self.skiplist: break
+            if True in self.skiplist:
+                break
             name = getattr(p, 'name', False)
-            if name and (name in self.skiplist or name in unique): continue
-            if p in self.skiplist or type(p) in self.skiplist: continue
+            if name and (name in self.skiplist or name in unique):
+                continue
+
+            if p in self.skiplist or type(p) in self.skiplist:
+                continue
             if name: unique.add(name)
             yield p
 
@@ -471,7 +479,10 @@ class Route(object):
         func = self.callback  # d(x)  d2('foo')(x)
         func = getattr(func, '__func__' if py3k else 'im_func', func)
         closure_attr = '__closure__' if py3k else 'func_closure'
+        print 'func: {}'.format(func)  # func: <function w at 0x2720488>
+        print 'closure_attr: {}'.format(closure_attr)  # closure_attr: func_closure
         while hasattr(func, closure_attr) and getattr(func, closure_attr):
+            print getattr(func, closure_attr)  # (<cell at 0x2727590: function object at 0x2720398>,)
             func = getattr(func, closure_attr)[0].cell_contents
         return func
 
