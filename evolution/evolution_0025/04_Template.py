@@ -461,6 +461,9 @@ def test():
     return dict(var='middle')
 执行 test()，获得返回值 return
 用返回值渲染 'start {{var}} end'，得到最后渲染的字符串
+
+wrapper = view(conf[0], **conf[1])(callback)
+
 """
 def view(tpl_name, **defaults):
     def decorator(func):
@@ -480,3 +483,31 @@ def view(tpl_name, **defaults):
 mako_view = functools.partial(view, template_adapter=MakoTemplate)
 cheetah_view = functools.partial(view, template_adapter=CheetahTemplate)
 jinja2_view = functools.partial(view, template_adapter=Jinja2Template)
+
+
+"""
+@view('start {{var}} end')
+def test():
+    return dict(var='middle')
+执行 test()，获得返回值 return
+用返回值渲染 'start {{var}} end'，得到最后渲染的字符串
+
+wrapper = view(conf[0], **conf[1])(callback)
+
+"""
+class TemplatePlugin(object):
+    ''' This plugin applies the :func:`view` decorator to all routes with a
+        `template` config parameter. If the parameter is a tuple, the second
+        element must be a dict with additional options (e.g. `template_engine`)
+        or default variables for the template. '''
+    name = 'template'
+    api  = 2
+
+    def apply(self, callback, route):
+        conf = route.config.get('template')
+        if isinstance(conf, (tuple, list)) and len(conf) == 2:
+            return view(conf[0], **conf[1])(callback)
+        elif isinstance(conf, str):
+            return view(conf)(callback)
+        else:
+            return callback
