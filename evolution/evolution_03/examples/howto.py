@@ -1,4 +1,6 @@
-from bottle import route, run, request, response, send_file, abort, validate, render
+from bottle import route, run, request, response, send_file, abort, validate, template, db, debug
+debug(True)
+
 
 # Lets start with "Hello World!"
 # Point your Browser to 'http://localhost:8080/' and greet the world :D
@@ -69,8 +71,14 @@ def validate_test(i, f, csv):
 # Templates
 @route('/template/test')
 def template_test():
-    return render('example', title='Template Test', items=[1,2,3,'fly'])
+    return template('howto', title='Template Test', items=[1,2,3,'fly'])
         
-import bottle
-bottle.DEBUG = True
-run(server=bottle.PasteServer, host='localhost', port=8080) 
+# Database
+@route('/db/counter')
+def db_counter_test():
+    if 'hits' not in db.counter:
+        db.counter.hits = 0
+    db['counter']['hits'] +=  1
+    return "Total hits in this page: %d!" % db.counter.hits
+
+run(host='localhost', port=8080) 
