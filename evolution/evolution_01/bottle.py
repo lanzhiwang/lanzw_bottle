@@ -141,7 +141,7 @@ class BreakTheBottle(BottleException):
     
     Causes the WSGIHandler to instantly call start_response() and return the
     content of output """
-    def __init__(self, output):
+    def __init__(self, output):  # BreakTheBottle(open(filename, 'r'))
         self.output = output
 
 
@@ -153,16 +153,21 @@ class BreakTheBottle(BottleException):
 
 class HeaderDict(dict):
     ''' A dictionary with case insensitive (titled) keys.
-    
     You may add a list of strings to send multible headers with the same name.'''
     def __setitem__(self, key, value):
-        return dict.__setitem__(self,key.title(), value)
+        return dict.__setitem__(self, key.title(), value)
+
     def __getitem__(self, key):
-        return dict.__getitem__(self,key.title())
+        return dict.__getitem__(self, key.title())
+
     def __delitem__(self, key):
-        return dict.__delitem__(self,key.title())
+        return dict.__delitem__(self, key.title())
+
     def __contains__(self, key):
-        return dict.__contains__(self,key.title())
+        return dict.__contains__(self, key.title())
+
+    def get(self, key):
+        return dict.get(self, key.title())
 
     def items(self):
         """ Returns a list of (key, value) tuples """
@@ -171,7 +176,7 @@ class HeaderDict(dict):
                 values = [values]
             for value in values:
                 yield (key, str(value))
-                
+
     def add(self, key, value):
         """ Adds a new header without deleting old ones """
         if isinstance(value, list):
@@ -318,10 +323,56 @@ def compile_route(route):
       '/user/:id#[0-9]+#' will match '/user/5' but not '/user/tim'
       Instead of "#" you can use any single special char other than "/"
     """
+    print(route)
     route = route.strip().lstrip('$^/ ').rstrip('$^ ')
-    route = re.sub(r':([a-zA-Z_]+)(?P<uniq>[^\w/])(?P<re>.+?)(?P=uniq)',r'(?P<\1>\g<re>)',route)
-    route = re.sub(r':([a-zA-Z_]+)',r'(?P<\1>[^/]+)', route)
+    print(route)
+    route = re.sub(
+        r':([a-zA-Z_]+)(?P<uniq>[^\w/])(?P<re>.+?)(?P=uniq)',
+        r'(?P<\1>\g<re>)',
+        route)
+    print(route)
+    route = re.sub(
+        r':([a-zA-Z_]+)',
+        r'(?P<\1>[^/]+)',
+        route)
+    print(route)
     return re.compile('^/%s$' % route)
+
+# for route in ['/user/(?P<id>[0-9]+)', '/user/:id/:action', '/user/:id#[0-9]+#']:
+#     compile_route(route)
+#     print()
+"""
+/user/(?P<id>[0-9]+)
+user/(?P<id>[0-9]+)
+user/(?P<id>[0-9]+)
+user/(?P<id>[0-9]+)
+()
+/user/:id/:action
+user/:id/:action
+user/:id/:action
+user/(?P<id>[^/]+)/(?P<action>[^/]+)
+()
+/user/:id#[0-9]+#
+user/:id#[0-9]+#
+user/(?P<id>[0-9]+)
+user/(?P<id>[0-9]+)
+()
+"""
+
+
+
+import re
+
+regex = re.compile(r':([a-zA-Z_]+)(?P<uniq>[^\w/])(?P<re>.+?)(?P=uniq)')
+
+for route in ['user/(?P<id>[0-9]+)', 'user/:id/:action', 'user/:id#[0-9]+#']:
+    print(route)
+    match = regex.match(route)
+    print('  ', match.groups())
+    print()
+
+
+
 
 
 def match_url(url, method='GET'):
@@ -330,20 +381,22 @@ def match_url(url, method='GET'):
     This reorders the ROUTING_REGEXP list every 1000 requests. To turn this off, use OPTIMIZER=False"""
     url = '/' + url.strip().lstrip("/")
     # Search for static routes first
+    # {'POST': {'/': <function index at 0x23137d0>}}
     route = ROUTES_SIMPLE.get(method,{}).get(url,None)
     if route:
       return (route, {})
     
     # Now search regexp routes
+    # {'GET': [[<_sre.SRE_Pattern object at 0x22cb200>, <function say at 0x23138c0>]]}
     routes = ROUTES_REGEXP.get(method,[])
     for i in xrange(len(routes)):
         match = routes[i][0].match(url)
         if match:
             handler = routes[i][1]
             if i > 0 and OPTIMIZER and random.random() <= 0.001:
-              # Every 1000 requests, we swap the matching route with its predecessor.
-              # Frequently used routes will slowly wander up the list.
-              routes[i-1], routes[i] = routes[i], routes[i-1]
+                # Every 1000 requests, we swap the matching route with its predecessor.
+                # Frequently used routes will slowly wander up the list.
+                routes[i-1], routes[i] = routes[i], routes[i-1]
             return handler, match.groupdict()
     raise HTTPError(404, "Not found")
 
@@ -356,11 +409,18 @@ def add_route(route, handler, method='GET', simple=False):
           return "Hello world!"
         add_route(r'/hello', hello)"""
     method = method.strip().upper()
+    print(method)
+    print(re.match(r'^/(\w+/)*\w*$', route))
     if re.match(r'^/(\w+/)*\w*$', route) or simple:
+        print(ROUTES_SIMPLE)
         ROUTES_SIMPLE.setdefault(method, {})[route] = handler
+        print(ROUTES_SIMPLE)
     else:
         route = compile_route(route)
+        print(route)
+        print(ROUTES_REGEXP)
         ROUTES_REGEXP.setdefault(method, []).append([route, handler])
+        print(ROUTES_REGEXP)
 
 
 def route(url, **kargs):
@@ -370,10 +430,39 @@ def route(url, **kargs):
         return handler
     return wrapper
 
+"""
+@route('/')
+def index():
+    return 'Hello World!'
 
+@route('/hello/:name')
+def say(name):
+    return 'Hello %s!' % name
+"""
 
+# def index():
+#     return 'Hello World!'
+# wrapper = route('/', method='POST')
+# index = wrapper(index)
 
+# def say(name):
+#     return 'Hello %s!' % name
+# wrapper = route('/hello/:name', method='get')
+# say = wrapper(say)
 
+"""
+[root@lanzhiwang-centos7 evolution_01]# python bottle.py
+POST
+<_sre.SRE_Match object at 0x23138a0>
+{}
+{'POST': {'/': <function index at 0x23137d0>}}
+GET
+None
+<_sre.SRE_Pattern object at 0x22cb200>
+{}
+{'GET': [[<_sre.SRE_Pattern object at 0x22cb200>, <function say at 0x23138c0>]]}
+[root@lanzhiwang-centos7 evolution_01]#
+"""
 
 # Error handling
 
@@ -391,8 +480,50 @@ def error(code=500):
     return wrapper
 
 
+# Default error handler
+
+# @error(500)
+def error500(exception):
+    """If an exception is thrown, deal with it and present an error page."""
+    if DEBUG:
+        return str(exception)
+    else:
+        return """<b>Error:</b> Internal server error."""
+
+# wrapper = error(500)
+# error500 = wrapper(error500)
 
 
+# @error(404)
+def error404(exception):
+    """If an exception is thrown, deal with it and present an error page."""
+    yield '<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">'
+    yield '<html><head><title>Error 404: Not found</title>'
+    yield '</head><body><h1>Error 404: Not found</h1>'
+    yield '<p>The requested URL %s was not found on this server.</p>' % request.path
+    yield '</body></html>'
+
+wrapper = error(404)
+error404 = wrapper(error404)
+# print(ERROR_HANDLER) # {404: <function error404 at 0x1d6d9b0>, 500: <function error500 at 0x1d6d8c0>}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Last but not least
+
+request = Request()
+response = Response()
 
 
 # Actual WSGI Stuff
@@ -401,15 +532,19 @@ def WSGIHandler(environ, start_response):
     """The bottle WSGI-handler."""
     global request
     global response
+    print(request)
+    print(response)
     request.bind(environ)
     response.bind()
     try:
+        print(request.path, request.method)
         handler, args = match_url(request.path, request.method)
         output = handler(**args)
-    except BreakTheBottle, shard:
+    except BreakTheBottle as shard:  # redirect send_file
         output = shard.output
-    except Exception, exception:
+    except Exception as exception:
         response.status = getattr(exception, 'http_status', 500)
+        print(response.status)
         errorhandler = ERROR_HANDLER.get(response.status, None)
         if errorhandler:
             try:
@@ -424,13 +559,16 @@ def WSGIHandler(environ, start_response):
 
         if response.status == 500:
             request._environ['wsgi.errors'].write("Error (500) on '%s': %s\n" % (request.path, exception))
+    print(output)
 
-    if hasattr(output, 'read'):
+    print(hasattr(output, 'read'))
+    if hasattr(output, 'read'):  # send_file
         if 'wsgi.file_wrapper' in environ:
             output = environ['wsgi.file_wrapper'](output)
         else:
             output =  iter(lambda: output.read(8192), '')
 
+    print(hasattr(output, '__len__'))
     if hasattr(output, '__len__') and 'Content-Length' not in response.header:
         response.header['Content-Length'] = len(output)
 
@@ -439,8 +577,27 @@ def WSGIHandler(environ, start_response):
 
     status = '%d %s' % (response.status, HTTP_CODES[response.status])
     start_response(status, list(response.header.items()))
+    print(output)
     return output
 
+"""
+[root@lanzhiwang-centos7 evolution_01]# python bottle.py
+Bottle server starting up (using WSGIRefServer (localhost:8080))...
+Listening on http://localhost:8080/
+Use Ctrl-C to quit.
+
+<__main__.Request object at 0x12fd600>
+<__main__.Response object at 0x12fdb48>
+('/', 'GET')
+404
+<generator object error404 at 0x13649b0>
+False
+False
+<generator object error404 at 0x13649b0>
+127.0.0.1 - - [28/Aug/2020 20:05:26] "GET / HTTP/1.1" 404 209
+^CShuting down...
+[root@lanzhiwang-centos7 evolution_01]#
+"""
 
 
 
@@ -514,7 +671,7 @@ def run(server=WSGIRefServer, host='127.0.0.1', port=8080, **kargs):
     except KeyboardInterrupt:
         print "Shuting down..."
 
-
+# run(host='localhost', port=8080, quiet=False)
 
 
 
@@ -535,10 +692,13 @@ def redirect(url, code=307):
 
 def send_file(filename, root, guessmime = True, mimetype = 'text/plain'):
     """ Aborts execution and sends a static files as response. """
+    print(filename, root)  # ('bottle.py', '')
     root = os.path.abspath(root) + '/'
     filename = os.path.normpath(filename).strip('/')
     filename = os.path.join(root, filename)
-    
+    print(filename, root)
+    # ('/root/work/code/lanzw_bottle/evolution/evolution_01/bottle.py', '/root/work/code/lanzw_bottle/evolution/evolution_01/')
+
     if not filename.startswith(root):
         abort(401, "Access denied.")
     if not os.path.exists(filename) or not os.path.isfile(filename):
@@ -546,7 +706,11 @@ def send_file(filename, root, guessmime = True, mimetype = 'text/plain'):
     if not os.access(filename, os.R_OK):
         abort(401, "You do not have permission to access this file.")
 
+    # fp = open(filename, 'r')
+    # print(hasattr(fp, 'read'))  # True
+
     if guessmime:
+        # print(mimetypes.guess_type(filename))  # ('text/x-python', None)
         guess = mimetypes.guess_type(filename)[0]
         if guess:
             response.content_type = guess
@@ -559,41 +723,9 @@ def send_file(filename, root, guessmime = True, mimetype = 'text/plain'):
     raise BreakTheBottle(open(filename, 'r'))
 
 
-
-
-
-
-# Default error handler
-
-@error(500)
-def error500(exception):
-    """If an exception is thrown, deal with it and present an error page."""
-    if DEBUG:
-        return str(exception)
-    else:
-        return """<b>Error:</b> Internal server error."""
-
-@error(404)
-def error404(exception):
-    """If an exception is thrown, deal with it and present an error page."""
-    yield '<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">'
-    yield '<html><head><title>Error 404: Not found</title>'
-    yield '</head><body><h1>Error 404: Not found</h1>'
-    yield '<p>The requested URL %s was not found on this server.</p>' % request.path
-    yield '</body></html>'
-
-
-
-
-
-
-# Last but not least
-
-request = Request()
-response = Response()
-
-
-
+basename = os.path.basename(__file__)
+root = os.path.dirname(__file__)
+send_file(basename, root)
 
 
 
