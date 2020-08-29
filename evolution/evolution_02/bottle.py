@@ -1,55 +1,4 @@
 """
-bottle.py is a one-file micro web framework.
-Inspired by itty.py (Daniel Lindsley)
-
-Licence (MIT)
--------------
-
-    Copyright (c) 2009, Marcel Hellkamp.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    THE SOFTWARE.
-
-
-Example
--------
-
-    from bottle import route, run, request, response, send_file, abort
-
-    @route('/')
-    def hello_world():
-        return 'Hello World!'
-
-    @route('/hello/:name')
-    def hello_name(name):
-        return 'Hello %s!' % name
-
-    @route('/hello', method='POST')
-    def hello_post():
-        name = request.POST['name']
-        return 'Hello %s!' % name
-
-    @route('/static/:filename#.*#')
-    def static_file(filename):
-        send_file(filename, root='/path/to/static/files/')
-
-    run(host='localhost', port=8080)
-
 """
 
 __author__ = 'Marcel Hellkamp'
@@ -71,7 +20,7 @@ try:
     from urlparse import parse_qs
 except ImportError:
     from cgi import parse_qs
-
+from pprint import pprint
 
 DEBUG = False
 OPTIMIZER = False
@@ -123,19 +72,13 @@ HTTP_CODES = {
 }
 
 
-
-
-
-
 # Exceptions and Events
 
 class BottleException(Exception):
-    """ A base class for exceptions used by bottle."""
     pass
 
 
 class HTTPError(BottleException):
-    """ A way to break the execution and instantly jump to an error handler. """
     def __init__(self, status, text):
         self.output = text
         self.http_status = int(status)
@@ -145,43 +88,33 @@ class HTTPError(BottleException):
 
 
 class BreakTheBottle(BottleException):
-    """ Not an exception, but a straight jump out of the controller code.
-    
-    Causes the WSGIHandler to instantly call start_response() and return the
-    content of output """
     def __init__(self, output):
         self.output = output
-
-
-
-
 
 
 # Classes
 
 class HeaderDict(dict):
-    ''' A dictionary with case insensitive (titled) keys.
-    
-    You may add a list of strings to send multible headers with the same name.'''
     def __setitem__(self, key, value):
-        return dict.__setitem__(self,key.title(), value)
+        return dict.__setitem__(self, key.title(), value)
+
     def __getitem__(self, key):
-        return dict.__getitem__(self,key.title())
+        return dict.__getitem__(self, key.title())
+
     def __delitem__(self, key):
-        return dict.__delitem__(self,key.title())
+        return dict.__delitem__(self, key.title())
+
     def __contains__(self, key):
-        return dict.__contains__(self,key.title())
+        return dict.__contains__(self, key.title())
 
     def items(self):
-        """ Returns a list of (key, value) tuples """
         for key, values in dict.items(self):
             if not isinstance(values, list):
                 values = [values]
             for value in values:
                 yield (key, str(value))
-                
+
     def add(self, key, value):
-        """ Adds a new header without deleting old ones """
         if isinstance(value, list):
             for v in value:
                 self.add(key, v)
@@ -195,10 +128,7 @@ class HeaderDict(dict):
 
 
 class Request(threading.local):
-    """ Represents a single request using thread-local namespace. """
-
     def bind(self, environ):
-        """ Binds the enviroment of the current request to this request handler """
         self._environ = environ
         self._GET = None
         self._POST = None
@@ -210,17 +140,14 @@ class Request(threading.local):
 
     @property
     def method(self):
-        ''' Returns the request method (GET,POST,PUT,DELETE,...) '''
         return self._environ.get('REQUEST_METHOD', 'GET').upper()
 
     @property
     def query_string(self):
-        ''' Content of QUERY_STRING '''
         return self._environ.get('QUERY_STRING', '')
 
     @property
     def input_length(self):
-        ''' Content of CONTENT_LENGTH '''
         try:
             return int(self._environ.get('CONTENT_LENGTH', '0'))
         except ValueError:
@@ -228,7 +155,6 @@ class Request(threading.local):
 
     @property
     def GET(self):
-        """Returns a dict with GET parameters."""
         if self._GET is None:
             raw_dict = parse_qs(self.query_string, keep_blank_values=1)
             self._GET = {}
@@ -241,7 +167,6 @@ class Request(threading.local):
 
     @property
     def POST(self):
-        """Returns a dict with parsed POST data."""
         if self._POST is None:
             raw_data = cgi.FieldStorage(fp=self._environ['wsgi.input'], environ=self._environ)
             self._POST = {}
@@ -256,14 +181,12 @@ class Request(threading.local):
 
     @property
     def params(self):
-        ''' Returns a mix of GET and POST data. POST overwrites GET '''
         if self._GETPOST is None:
             self._GETPOST = dict(self.GET)
             self._GETPOST.update(self.POST)
 
     @property
     def COOKIES(self):
-        """Returns a dict with COOKIES."""
         if self._COOKIES is None:
             raw_dict = Cookie.SimpleCookie(self._environ.get('HTTP_COOKIE',''))
             self._COOKIES = {}
@@ -273,12 +196,8 @@ class Request(threading.local):
 
 
 class Response(threading.local):
-    """ Represents a single response using thread-local namespace. """
-
     def bind(self):
-        """ Clears old data and creates a brand new Response object """
         self._COOKIES = None
-
         self.status = 200
         self.header = HeaderDict()
         self.content_type = 'text/html'
@@ -291,40 +210,28 @@ class Response(threading.local):
         return self._COOKIES
 
     def set_cookie(self, key, value, **kargs):
-        """ Sets a Cookie. Optional settings: expires, path, comment, domain, max-age, secure, version, httponly """
         self.COOKIES[key] = value
         for k in kargs:
             self.COOKIES[key][k] = kargs[k]
 
     def get_content_type(self):
-        '''Gives access to the 'Content-Type' header and defaults to 'text/html'.'''
         return self.header['Content-Type']
-        
+
     def set_content_type(self, value):
         self.header['Content-Type'] = value
-        
+
     content_type = property(get_content_type, set_content_type, None, get_content_type.__doc__)
-
-
-
-
 
 
 # Routing
 
 def compile_route(route):
-    """ Compiles a route string and returns a precompiled RegexObject.
+    """
+    '/user/(?P<id>[0-9]+)' will match '/user/5' with {'id':'5'}
 
-    Routes may contain regular expressions with named groups to support url parameters.
-    Example:
-      '/user/(?P<id>[0-9]+)' will match '/user/5' with {'id':'5'}
+    '/user/:id/:action' will match '/user/5/kiss' with {'id':'5', 'action':'kiss'}
 
-    A more human readable syntax is supported too.
-    Example:
-      '/user/:id/:action' will match '/user/5/kiss' with {'id':'5', 'action':'kiss'}
-      Placeholders match everything up to the next slash.
-      '/user/:id#[0-9]+#' will match '/user/5' but not '/user/tim'
-      Instead of "#" you can use any single special char other than "/"
+    '/user/:id#[0-9]+#' will match '/user/5' but not '/user/tim'
     """
     route = route.strip().lstrip('$^/ ').rstrip('$^ ')
     route = re.sub(r':([a-zA-Z_]+)(?P<uniq>[^\w/])(?P<re>.+?)(?P=uniq)',r'(?P<\1>\g<re>)',route)
@@ -333,36 +240,24 @@ def compile_route(route):
 
 
 def match_url(url, method='GET'):
-    """Returns the first matching handler and a parameter dict or raises HTTPError(404).
-    
-    This reorders the ROUTING_REGEXP list every 1000 requests. To turn this off, use OPTIMIZER=False"""
     url = '/' + url.strip().lstrip("/")
-    # Search for static routes first
     route = ROUTES_SIMPLE.get(method,{}).get(url,None)
     if route:
-      return (route, {})
-    
-    # Now search regexp routes
+        return (route, {})
     routes = ROUTES_REGEXP.get(method,[])
     for i in xrange(len(routes)):
         match = routes[i][0].match(url)
         if match:
             handler = routes[i][1]
             if i > 0 and OPTIMIZER and random.random() <= 0.001:
-              # Every 1000 requests, we swap the matching route with its predecessor.
-              # Frequently used routes will slowly wander up the list.
-              routes[i-1], routes[i] = routes[i], routes[i-1]
+                # Every 1000 requests, we swap the matching route with its predecessor.
+                # Frequently used routes will slowly wander up the list.
+                routes[i-1], routes[i] = routes[i], routes[i-1]
             return handler, match.groupdict()
     raise HTTPError(404, "Not found")
 
 
 def add_route(route, handler, method='GET', simple=False):
-    """ Adds a new route to the route mappings.
-
-        Example:
-        def hello():
-          return "Hello world!"
-        add_route(r'/hello', hello)"""
     method = method.strip().upper()
     if re.match(r'^/(\w+/)*\w*$', route) or simple:
         ROUTES_SIMPLE.setdefault(method, {})[route] = handler
@@ -372,15 +267,10 @@ def add_route(route, handler, method='GET', simple=False):
 
 
 def route(url, **kargs):
-    """ Decorator for request handler. Same as add_route(url, handler)."""
     def wrapper(handler):
         add_route(url, handler, **kargs)
         return handler
     return wrapper
-
-
-
-
 
 
 # Error handling
@@ -399,24 +289,29 @@ def error(code=500):
     return wrapper
 
 
-
-
-
-
 # Actual WSGI Stuff
 
 def WSGIHandler(environ, start_response):
     """The bottle WSGI-handler."""
+    pprint(environ)
     global request
     global response
     request.bind(environ)
     response.bind()
+    pprint('path: %s' % request.path)
+    pprint('method: %s' % request.method)
+    pprint('query_string: %s' % request.query_string)
+    pprint('input_length: %s' % request.input_length)
+    pprint('GET: %s' % request.GET)
+    pprint('POST: %s' % request.POST)
+    pprint('params: %s' % request.params)
+    pprint('COOKIES: %s' % request.COOKIES)
     try:
         handler, args = match_url(request.path, request.method)
         output = handler(**args)
-    except BreakTheBottle, shard:
+    except BreakTheBottle as shard:
         output = shard.output
-    except Exception, exception:
+    except Exception as exception:
         response.status = getattr(exception, 'http_status', 500)
         errorhandler = ERROR_HANDLER.get(response.status, None)
         if errorhandler:
@@ -446,10 +341,6 @@ def WSGIHandler(environ, start_response):
     status = '%d %s' % (response.status, HTTP_CODES[response.status])
     start_response(status, list(response.header.items()))
     return output
-
-
-
-
 
 
 # Server adapter
@@ -494,6 +385,7 @@ class PasteServer(ServerAdapter):
         app = TransLogger(handler)
         httpserver.serve(app, host=self.host, port=str(self.port))
 
+
 class FapwsServer(ServerAdapter):
     """ Extreamly fast Webserver using libev (see http://william-os4y.livejournal.com/)
         Experimental ... """
@@ -509,14 +401,9 @@ class FapwsServer(ServerAdapter):
         evwsgi.wsgi_cb(('',app))
         evwsgi.run()
 
+
 def run(server=WSGIRefServer, host='127.0.0.1', port=8080, optinmize = False, **kargs):
-    """ Runs bottle as a web server, using Python's built-in wsgiref implementation by default.
-    
-    You may choose between WSGIRefServer, CherryPyServer, FlupServer and
-    PasteServer or write your own server adapter.
-    """
     global OPTIMIZER
-    
     OPTIMIZER = bool(optinmize)
     quiet = bool('quiet' in kargs and kargs['quiet'])
 
@@ -539,30 +426,23 @@ def run(server=WSGIRefServer, host='127.0.0.1', port=8080, optinmize = False, **
         print "Shuting down..."
 
 
-
-
-
-
 # Helper
 
 def abort(code=500, text='Unknown Error: Appliction stopped.'):
-    """ Aborts execution and causes a HTTP error. """
     raise HTTPError(code, text)
 
 
 def redirect(url, code=307):
-    """ Aborts execution and causes a 307 redirect """
     response.status = code
     response.header['Location'] = url
     raise BreakTheBottle("")
 
 
 def send_file(filename, root, guessmime = True, mimetype = 'text/plain'):
-    """ Aborts execution and sends a static files as response. """
     root = os.path.abspath(root) + '/'
     filename = os.path.normpath(filename).strip('/')
     filename = os.path.join(root, filename)
-    
+
     if not filename.startswith(root):
         abort(401, "Access denied.")
     if not os.path.exists(filename) or not os.path.isfile(filename):
@@ -591,22 +471,16 @@ def send_file(filename, root, guessmime = True, mimetype = 'text/plain'):
     raise BreakTheBottle(open(filename, 'r'))
 
 
-
-
-
-
 # Decorator
 
 def validate(**vkargs):
-    ''' Validates and manipulates keyword arguments by user defined callables 
-    and handles ValueError and missing arguments by raising HTTPError(400)
-    
+    '''
     Examples:
     @validate(id=int, x=float, y=float)
         def move(id, x, y):
             assert isinstance(id, list)
             assert isinstance(x, float)
-    
+
     @validate(cvs=lambda x: map(int, x.strip().split(',')))
         def add_list(cvs):
             assert isinstance(cvs, list)
@@ -624,9 +498,15 @@ def validate(**vkargs):
         return wrapper
     return decorator
 
+"""
+@route('/validate/:i/:f/:csv')
+@validate(i=int, f=float, csv=lambda x: map(int, x.strip().split(',')))
+def validate_test(i, f, csv):
+    return "Int: %d, Float:%f, List:%s" % (i, f, repr(csv))
 
-
-
+decorator = validate(i=int, f=float, csv=lambda x: map(int, x.strip().split(',')))
+wrapper = decorator(validate_test)
+"""
 
 
 # Default error handler
@@ -654,10 +534,6 @@ def error_http(exception):
     if hasattr(exception, 'output'):
       yield exception.output
     yield '</body></html>'
-
-
-
-
 
 
 # Last but not least
