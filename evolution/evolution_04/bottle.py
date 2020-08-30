@@ -1,64 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Bottle is a fast and simple micro-framework for small web applications. It
-offers request dispatching (Routes) with url parameter support, templates,
-key/value databases, a built-in HTTP Server and adapters for many third party
-WSGI/HTTP-server and template engines - all in a single file and with no
-dependencies other than the Python Standard Library.
-
-Homepage and documentation: http://wiki.github.com/defnull/bottle
-
-Special thanks to Stefan Matthias Aust [http://github.com/sma]
-  for his contribution to SimpleTemplate
-
-Licence (MIT)
--------------
-
-    Copyright (c) 2009, Marcel Hellkamp.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    THE SOFTWARE.
-
-
-Example
--------
-
-    from bottle import route, run, request, response, send_file, abort
-
-    @route('/')
-    def hello_world():
-        return 'Hello World!'
-
-    @route('/hello/:name')
-    def hello_name(name):
-        return 'Hello %s!' % name
-
-    @route('/hello', method='POST')
-    def hello_post():
-        name = request.POST['name']
-        return 'Hello %s!' % name
-
-    @route('/static/:filename#.*#')
-    def static_file(filename):
-        send_file(filename, root='/path/to/static/files/')
-
-    run(host='localhost', port=8080)
-
 """
 
 __author__ = 'Marcel Hellkamp'
@@ -86,6 +27,13 @@ import thread
 import tempfile
 
 
+"""
+>>> sys.version_info
+sys.version_info(major=2, minor=7, micro=5, releaselevel='final', serial=0)
+>>> sys.version_info >= (3,0,0)
+False
+>>>
+"""
 if sys.version_info >= (3,0,0):
     from io import BytesIO
     from io import TextIOWrapper
@@ -102,18 +50,14 @@ try:
     import cPickle as pickle
 except ImportError: # pragma: no cover
     import pickle as pickle
-  
+
 try:
     try:
         from json import dumps as json_dumps
     except ImportError: # pragma: no cover
-        from simplejson import dumps as json_dumps 
+        from simplejson import dumps as json_dumps
 except ImportError: # pragma: no cover
     json_dumps = None
-
-
-
-
 
 
 # Exceptions and Events
@@ -154,10 +98,6 @@ class BreakTheBottle(BottleException):
         self.output = output
 
 
-
-
-
-
 # WSGI abstraction: Request and response management
 
 _default_app = None
@@ -174,22 +114,28 @@ def default_app(newapp = None):
     return _default_app
 
 
-class RouteError(Exception): pass
-class NoRouteError(RouteError): pass
+class RouteError(Exception):
+    pass
+
+
+class NoRouteError(RouteError):
+    pass
+
+
 class RouteSyntaxError(RouteError):
-    """ The route parser found stuff not supported by this router """
+    pass
+
+
 class TooManyRoutesError(RouteError):
-    """ Open a new router. This one is full """
+    pass
 
 
 class Router(object):
-    def match(self, uri): 
-        """ Returns a (data, parameter) tuple matching uri or (None, None) """
-        raise NotImplementedError()
-    def add(self, route, data):
-        """Adds a route to the router """
-        raise NotImplementedError()
+    def match(self, uri):
+        raise NotImplementedError
 
+    def add(self, route, data):
+        raise NotImplementedError
 
 
 class StaticRouter(Router):
@@ -198,16 +144,20 @@ class StaticRouter(Router):
         self.routemap = dict()
 
     def match(self, uri):
+        """
+        match('%s;%s' % (method, path))
+        """
         return self.routemap.get(uri, None), None
-    
+
     def add(self, route, data):
+        """
+        add(url, handler)
+        routemap = {url: handler}
+        """
         self.routemap[route] = data
 
 
-
 class RegexRouter(Router):
-    ''' Matches up to 100* regular expressions at a time and extract
-        parameters from URIs. * This s a limitation of the Python re module '''
     def __init__(self):
         self.routes = []
         self.full_re = None
@@ -222,6 +172,10 @@ class RegexRouter(Router):
         return data, group_re.match(uri).groupdict()
 
     def add(self, route, data):
+        """
+        add(url, handler)
+        routes = [(handler, named_re)]
+        """
         # Pattern for parameter matching
         named_re = re.sub(r':([a-zA-Z_]+)(?P<uniq>[^\w/])(?P<re>.+?)(?P=uniq)',
                           r'(?P<\1>\g<re>)', route)
@@ -253,15 +207,15 @@ class RegexRouter(Router):
         self.routes.append((data, named_re))
 
 
-
 class RouterCollection(Router):
-    """ Handles different types of routers """
-
     def __init__(self):
         self.simple = [StaticRouter()]
         self.dynamic = [RegexRouter()]
 
     def match(self, uri):
+        """
+        match('%s;%s' % (method, path))
+        """
         for group in (self.simple, self.dynamic):
             for router in group:
                 m, d = router.match(uri)
@@ -270,6 +224,9 @@ class RouterCollection(Router):
         return None, None
 
     def add(self, route, data, simple = False):
+        """
+        add(url, handler, **kargs)
+        """
         if simple or ('|' not in route and ':' not in route):
             add_to = self.simple
         else:
@@ -282,9 +239,7 @@ class RouterCollection(Router):
             add_to[-1].add(route, data)
 
 
-
 class Bottle(object):
-
     def __init__(self, catchall=True, autojson=True):
         self.routes = RouterCollection()
         self.default_route = None
@@ -313,6 +268,14 @@ class Bottle(object):
         """
         Decorator for request handler.
         Same as add_route(url, handler, **kargs).
+
+        default_app().route(url, **kargs)
+        @route('/')
+        def hello_world():
+            return 'Hello World!'
+
+        wrapper = default_app().route(url, **kargs)
+        handler = wrapper(handler)
         """
         def wrapper(handler):
             self.routes.add(url, handler, **kargs)
@@ -371,7 +334,6 @@ class Bottle(object):
             raise TypeError('Request handler for route "%s" returned [%s] '
             'which is not iterable.' % (request.path, type(out).__name__))
         return out
-
 
     def __call__(self, environ, start_response):
         """ The bottle WSGI-interface. """
