@@ -1,62 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Bottle is a fast and simple micro-framework for small web applications. It
-offers request dispatching (Routes) with url parameter support, templates,
-a built-in HTTP Server and adapters for many third party WSGI/HTTP-server and
-template engines - all in a single file and with no dependencies other than the
-Python Standard Library.
-
-Homepage and documentation: http://wiki.github.com/defnull/bottle
-
-Licence (MIT)
--------------
-
-    Copyright (c) 2009, Marcel Hellkamp.
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    THE SOFTWARE.
-
-
-Example
--------
-
-This is an example::
-
-    from bottle import route, run, request, response, send_file, abort
-    
-    @route('/')
-    def hello_world():
-        return 'Hello World!'
-    
-    @route('/hello/:name')
-    def hello_name(name):
-        return 'Hello %s!' % name
-    
-    @route('/hello', method='POST')
-    def hello_post():
-        name = request.POST['name']
-        return 'Hello %s!' % name
-    
-    @route('/static/:filename#.*#')
-    def static_file(filename):
-        send_file(filename, root='/path/to/static/files/')
-    
-    run(host='localhost', port=8080)
 """
 
 from __future__ import with_statement
@@ -127,10 +70,6 @@ def tob(data, enc='utf8'): # Convert strings to bytes (py2 and py3)
     return data.encode(enc) if isinstance(data, unicode) else data
 
 
-
-
-
-
 # Exceptions and Events
 
 class BottleException(Exception):
@@ -162,10 +101,6 @@ class HTTPError(HTTPResponse):
 
     def __repr__(self):
         return ''.join(ERROR_PAGE_TEMPLATE.render(e=self))
-
-
-
-
 
 
 # Routing
@@ -327,45 +262,26 @@ class Router(object):
         return self.routes == other.routes
 
 
+# Output filter
 
-
+def dict2json(d):
+    response.content_type = 'application/json'
+    return json_dumps(d)
 
 
 # WSGI abstraction: Application, Request and Response objects
 
 class Bottle(object):
-    """ WSGI application """
-
     def __init__(self, catchall=True, autojson=True, path = ''):
-        """ Create a new bottle instance.
-            You usually don't do that. Use `bottle.app.push()` instead.
-        """
         self.routes = Router()
         self.mounts = {}
-        self.error_handler = {}
+        self.error_handler = {}  # error_handler = {404: handler, 500: handler}
         self.catchall = catchall
         self.config = dict()
         self.serve = True
-        self.castfilter = []
+        self.castfilter = []  # self.castfilter = [(dict, dict2json), ()]
         if autojson and json_dumps:
             self.add_filter(dict, dict2json)
-
-    def mount(self, app, script_path):
-        ''' Mount a Bottle application to a specific URL prefix '''
-        if not isinstance(app, Bottle):
-            raise TypeError('Only Bottle instances are supported for now.')
-        script_path = '/'.join(filter(None, script_path.split('/')))
-        path_depth = script_path.count('/') + 1
-        if not script_path:
-            raise TypeError('Empty script_path. Perhaps you want a merge()?')
-        for other in self.mounts:
-            if other.startswith(script_path):
-                raise TypeError('Conflict with existing mount: %s' % other)
-        @self.route('/%s/:#.*#' % script_path, method="ANY")
-        def mountpoint():
-            request.path_shift(path_depth)
-            return app.handle(request.path, request.method)
-        self.mounts[script_path] = app
 
     def add_filter(self, ftype, func):
         ''' Register a new output filter. Whenever bottle hits a handler output
@@ -376,40 +292,15 @@ class Bottle(object):
         self.castfilter.append((ftype, func))
         self.castfilter.sort()
 
-    def match_url(self, path, method='GET'):
-        """ Find a callback bound to a path and a specific HTTP method.
-            Return (callback, param) tuple or (None, {}).
-            method: HEAD falls back to GET. HEAD and GET fall back to ALL.
-        """
-        path = path.strip().lstrip('/')
-        handler, param = self.routes.match(method + ';' + path)
-        if handler: return handler, param
-        if method == 'HEAD':
-            handler, param = self.routes.match('GET;' + path)
-            if handler: return handler, param
-        handler, param = self.routes.match('ANY;' + path)
-        if handler: return handler, param
-        return None, {}
-
-    def get_url(self, routename, **kargs):
-        """ Return a string that matches a named route """
-        return '/' + self.routes.build(routename, **kargs).split(';', 1)[1]
-
     def route(self, path=None, method='GET', **kargs):
-        """ Decorator: Bind a function to a GET request path.
-
-            If the path parameter is None, the signature of the decorated
-            function is used to generate the path. See yieldroutes()
-            for details.
-
-            The method parameter (default: GET) specifies the HTTP request
-            method to listen to. You can specify a list of methods. 
-        """
         if isinstance(method, str): #TODO: Test this
             method = method.split(';')
         def wrapper(callback):
-            paths = [] if path is None else [path.strip().lstrip('/')]
-            if not paths: # Lets generate the path automatically 
+            if path is None:
+                paths = []
+            else:
+                paths = [path.strip().lstrip('/')]
+            if not paths:
                 paths = yieldroutes(callback)
             for p in paths:
                 for m in method:
@@ -418,12 +309,60 @@ class Bottle(object):
             return callback
         return wrapper
 
+    def match_url(self, path, method='GET'):
+        path = path.strip().lstrip('/')
+        handler, param = self.routes.match(method + ';' + path)
+        if handler:
+            return handler, param
+        if method == 'HEAD':
+            handler, param = self.routes.match('GET;' + path)
+            if handler:
+                return handler, param
+        handler, param = self.routes.match('ANY;' + path)
+        if handler:
+            return handler, param
+        return None, {}
+
+    def get_url(self, routename, **kargs):
+        """ Return a string that matches a named route """
+        return '/' + self.routes.build(routename, **kargs).split(';', 1)[1]
+
     def error(self, code=500):
         """ Decorator: Registrer an output handler for a HTTP error code"""
         def wrapper(handler):
             self.error_handler[int(code)] = handler
             return handler
         return wrapper
+
+    def mount(self, app, script_path):
+        '''
+        subapp = bottle.Bottle()
+        @subapp.route('/')
+        @subapp.route('/test/:test')
+        def test(test='foo'):
+            return test
+
+        bottle.app().mount(subapp, '/test1/test2/test3/')
+        '''
+        if not isinstance(app, Bottle):
+            raise TypeError('Only Bottle instances are supported for now.')
+        # print(script_path)  # /test1/test2/test3/
+        # print(script_path.split('/'))  # ['', 'test1', 'test2', 'test3', '']
+        # print(filter(None, script_path.split('/')))  # ['test1', 'test2', 'test3']
+        script_path = '/'.join(filter(None, script_path.split('/')))
+        # print(script_path)  # test1/test2/test3
+        path_depth = script_path.count('/') + 1
+        # print(path_depth)  # 3
+        if not script_path:
+            raise TypeError('Empty script_path. Perhaps you want a merge()?')
+        for other in self.mounts:
+            if other.startswith(script_path):
+                raise TypeError('Conflict with existing mount: %s' % other)
+        @self.route('/%s/:#.*#' % script_path, method="ANY")
+        def mountpoint():
+            request.path_shift(path_depth)
+            return app.handle(request.path, request.method)
+        self.mounts[script_path] = app
 
     def handle(self, url, method, catchall=True):
         """ Execute the handler bound to the specified url and method and return
@@ -438,11 +377,10 @@ class Bottle(object):
 
         try:
             return handler(**args)
-        except HTTPResponse, e:
+        except HTTPResponse as e:
             return e
-        except Exception, e:
-            if isinstance(e, (KeyboardInterrupt, SystemExit, MemoryError))\
-            or not self.catchall:
+        except Exception as e:
+            if isinstance(e, (KeyboardInterrupt, SystemExit, MemoryError)) or not self.catchall:
                 raise
             return HTTPError(500, 'Unhandled exception', e, format_exc(10))
 
@@ -535,6 +473,7 @@ class Bottle(object):
             environ['wsgi.errors'].write(err) #TODO: wsgi.error should not get html
             start_response('500 INTERNAL SERVER ERROR', [('Content-Type', 'text/html')])
             return [tob(err)]
+
 
 
 class Request(threading.local, DictMixin):
@@ -885,11 +824,6 @@ class AppStack(list):
 
 # Module level functions
 
-# Output filter
-
-def dict2json(d):
-    response.content_type = 'application/json'
-    return json_dumps(d)
 
 
 def abort(code=500, text='Unknown Error: Appliction stopped.'):
@@ -1017,7 +951,7 @@ def tonativefunc(enc='utf-8'):
 
 
 def yieldroutes(func):
-    """ Return a generator for routes that match the signature (name, args) 
+    """ Return a generator for routes that match the signature (name, args)
     of the func parameter. This may yield more than one route if the function
     takes optional keyword arguments. The output is best described by example:
       a()         -> '/a'
