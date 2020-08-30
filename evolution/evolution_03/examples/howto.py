@@ -72,7 +72,7 @@ def validate_test(i, f, csv):
 @route('/template/test')
 def template_test():
     return template('howto', title='Template Test', items=[1,2,3,'fly'])
-        
+
 # Database
 @route('/db/counter')
 def db_counter_test():
@@ -81,4 +81,4 @@ def db_counter_test():
     db['counter']['hits'] +=  1
     return "Total hits in this page: %d!" % db.counter.hits
 
-run(host='localhost', port=8080) 
+run(host='localhost', port=8080, reloader=True)

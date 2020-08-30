@@ -94,6 +94,16 @@ class BaseController(object):
             cls._singleton = object.__new__(cls, *a, **k)
         return cls._singleton
 
+# class CTest(BaseController):
+#     def _no(self):
+#         return 'no'
+
+#     def yes(self):
+#         return 'yes'
+
+#     def yes2(self, test):
+#         return test
+
 # bs1 = BaseController()
 # bs2 = BaseController()
 # bs3 = BaseController()
@@ -107,6 +117,21 @@ class BaseController(object):
 36167888
 36167888
 36167888
+"""
+
+# ct1 = CTest()
+# ct2 = CTest()
+# ct3 = CTest()
+# ct4 = CTest()
+# print(ct1)
+# print(ct2)
+# print(ct3)
+# print(ct4)
+"""
+<__main__.BaseController object at 0x1686810>
+<__main__.BaseController object at 0x1686810>
+<__main__.BaseController object at 0x1686810>
+<__main__.BaseController object at 0x1686810>
 """
 
 class Bottle(object):
@@ -222,6 +247,18 @@ class Bottle(object):
         Set Content-Type and Content-Length when possible. Then clear output
         on HEAD requests.
         Supports: False, str, unicode, list(unicode), dict(), open()
+
+        [
+            'test',
+            ['t','e','st'],
+            [],
+            None,
+            12345,
+            StringIO('test'),
+            u'äöüß',
+            [u'äöüß'],
+            {'a': 1}
+        ]
         """
         if not out:
             out = []
@@ -240,7 +277,8 @@ class Bottle(object):
                   lambda x: iter(lambda: x.read(8192), ''))(out)
 
         if isinstance(out, list) and len(out) == 1:
-            response.header['Content-Length'] = str(len(out[0]))
+            # response.header['Content-Length'] = str(len(out[0]))
+            print(str(len(out[0])))
         if request.method.upper() == 'HEAD' and self.clearhead:
             out = []
         if not hasattr(out, '__iter__'):
@@ -261,7 +299,7 @@ class Bottle(object):
                     raise HTTPError(404, "Not found")
                 output = handler(**args)
                 db.close()
-            except BreakTheBottle as e:
+            except BreakTheBottle as e:  # redirect send_file
                 output = e.output
             except HTTPError as e:
                 response.status = e.http_status
@@ -271,7 +309,7 @@ class Bottle(object):
                 output = [] # rfc2616 section 4.3
         except (KeyboardInterrupt, SystemExit, MemoryError):
             raise
-        except Exception, e:
+        except Exception as e:
             response.status = 500
             if self.catchall:
                 err = "Unhandled Exception: %s\n" % (repr(e))
@@ -319,12 +357,6 @@ route: /ctest/yes/:test, controller: <__main__.CTest object at 0xf142d0>, kargs:
 add_route
 route: /ctest/yes/:test, handler: <bound method CTest.yes2 of <__main__.CTest object at 0xf142d0>>, method: GET, simple: False, kargs: {'action': 'yes2'}
 """
-
-
-
-
-
-
 
 
 class Request(threading.local):
@@ -472,9 +504,6 @@ class Response(threading.local):
                             get_content_type.__doc__)
 
 
-
-
-
 def abort(code=500, text='Unknown Error: Appliction stopped.'):
     """ Aborts execution and causes a HTTP error. """
     raise HTTPError(code, text)
@@ -491,7 +520,6 @@ def send_file(filename, root, guessmime = True, mimetype = None):
     """ Aborts execution and sends a static files as response. """
     root = os.path.abspath(root) + '/'
     filename = os.path.abspath(os.path.join(root, filename.strip('/')))
-    
     if not filename.startswith(root):
         abort(401, "Access denied.")
     if not os.path.exists(filename) or not os.path.isfile(filename):
@@ -536,10 +564,6 @@ def parse_date(ims):
         return None
 
 
-
-
-
-
 # Decorators
 
 def validate(**vkargs):
@@ -554,11 +578,21 @@ def validate(**vkargs):
                     abort(403, 'Missing parameter: %s' % key)
                 try:
                     kargs[key] = value(kargs[key])
-                except ValueError, e:
+                except ValueError as e:
                     abort(403, 'Wrong parameter format for: %s' % key)
             return func(**kargs)
         return wrapper
     return decorator
+
+"""
+@route('/validate/:i/:f/:csv')
+@validate(i=int, f=float, csv=lambda x: map(int, x.strip().split(',')))
+def validate_test(i, f, csv):
+    return "Int: %d, Float:%f, List:%s" % (i, f, repr(csv))
+
+decorator = validate(i=int, f=float, csv=lambda x: map(int, x.strip().split(',')))
+wrapper = decorator(validate_test)
+"""
 
 
 def route(url, **kargs):
@@ -578,10 +612,6 @@ def error(code=500):
     Decorator for error handler. Same as set_error_handler(code, handler).
     """
     return default_app().error(code)
-
-
-
-
 
 
 # Server adapter
@@ -657,12 +687,16 @@ class FapwsServer(ServerAdapter):
         evwsgi.run()
 
 
-def run(app=None, server=WSGIRefServer, host='127.0.0.1', port=8080,
-        interval=1, reloader=False, **kargs):
-    """ Runs bottle as a web server. """
+def run(
+    app=None,
+    server=WSGIRefServer,
+    host='127.0.0.1',
+    port=8080,
+    interval=1,
+    reloader=False,
+    **kargs):
     if not app:
         app = default_app()
-    
     quiet = bool(kargs.get('quiet', False))
 
     # Instantiate server, if it is a class instead of an instance
@@ -674,7 +708,7 @@ def run(app=None, server=WSGIRefServer, host='127.0.0.1', port=8080,
 
     if not isinstance(server, WSGIAdapter):
         raise RuntimeError("Server must be a subclass of WSGIAdapter")
- 
+
     if not quiet and isinstance(server, ServerAdapter): # pragma: no cover
         if not reloader or os.environ.get('BOTTLE_CHILD') == 'true':
             print "Bottle server starting up (using %s)..." % repr(server)
@@ -721,6 +755,7 @@ def reloader_run(server, app, interval):
                 sys.exit(3)
     while True:
         args = [sys.executable] + sys.argv
+        # print(args)  # ['/usr/bin/python', 'howto.py']
         environ = os.environ.copy()
         environ['BOTTLE_CHILD'] = 'true'
         exit_status = subprocess.call(args, env=environ)
@@ -728,14 +763,12 @@ def reloader_run(server, app, interval):
             sys.exit(exit_status)
 
 
-
-
-
 # Templates
 
 class TemplateError(HTTPError):
     def __init__(self, message):
         HTTPError.__init__(self, 500, message)
+
 
 class BaseTemplate(object):
     def __init__(self, template='', name=None, filename=None, lookup=[]):
@@ -939,7 +972,6 @@ class SimpleTemplate(BaseTemplate):
         stdout = []
         self.execute(stdout, **args)
         return stdout
-            
 
 
 def template(tpl, template_adapter=SimpleTemplate, **args):
@@ -947,8 +979,8 @@ def template(tpl, template_adapter=SimpleTemplate, **args):
     Get a rendered template as a string iterator.
     You can use a name, a filename or a template string as first parameter.
     '''
-    lookup = args.get('template_lookup', TEMPLATE_PATH)
-    if tpl not in TEMPLATES or DEBUG:
+    lookup = args.get('template_lookup', TEMPLATE_PATH)  # TEMPLATE_PATH = ['./', './views/']
+    if tpl not in TEMPLATES or DEBUG:  # TEMPLATES = {}
         if "\n" in tpl or "{" in tpl or "%" in tpl or '$' in tpl:
             TEMPLATES[tpl] = template_adapter(template=tpl, lookup=lookup)
         elif '.' in tpl:
@@ -963,22 +995,27 @@ def template(tpl, template_adapter=SimpleTemplate, **args):
     return TEMPLATES[tpl].render(**args)
 
 
+# @route('/template/test')
+# def template_test():
+#     return template('howto', title='Template Test', items=[1,2,3,'fly'])
+
+
 def mako_template(tpl_name, **kargs):
     kargs['template_adapter'] = MakoTemplate
     return template(tpl_name, **kargs)
+
 
 def cheetah_template(tpl_name, **kargs):
     kargs['template_adapter'] = CheetahTemplate
     return template(tpl_name, **kargs)
 
+
 def jinja2_template(tpl_name, **kargs):
     kargs['template_adapter'] = Jinja2Template
     return template(tpl_name, **kargs)
 
+
 def view(tpl_name, **defaults):
-    ''' Decorator: Rendes a template for a handler.
-        Return a dict of template vars to fill out the template.
-    '''
     def decorator(func):
         def wrapper(**kargs):
             out = func(**kargs)
@@ -987,64 +1024,82 @@ def view(tpl_name, **defaults):
         return wrapper
     return decorator
 
+
+# @bottle.route('/tpl')
+# @bottle.view('stpl_t2main')
+# def test():
+#     return dict(content='1234')
+
+# decorator = view('stpl_t2main')
+# wrapper = decorator(test)
+
+
 def mako_view(tpl_name, **kargs):
     kargs['template_adapter'] = MakoTemplate
     return view(tpl_name, **kargs)
 
+
 def cheetah_view(tpl_name, **kargs):
     kargs['template_adapter'] = CheetahTemplate
     return view(tpl_name, **kargs)
+
 
 def jinja2_view(tpl_name, **kargs):
     kargs['template_adapter'] = Jinja2Template
     return view(tpl_name, **kargs)
 
 
-
-
-
-
-
 # Database
 
-class BottleBucket(object): # pragma: no cover
-    """ Memory-caching wrapper around anydbm """
+class BottleBucket(object):
     def __init__(self, name):
         self.__dict__['name'] = name
         self.__dict__['db'] = dbm.open(DB_PATH + '/%s.db' % name, 'c')
         self.__dict__['mmap'] = {}
-            
+        # {'mmap': {}, 'db': {}, 'name': 'bb'}
+
     def __getitem__(self, key):
+        print('BottleBucket getitem key: %s' % key)
         if key not in self.mmap:
             self.mmap[key] = pickle.loads(self.db[key])
         return self.mmap[key]
-    
+
     def __setitem__(self, key, value):
-        if not isinstance(key, str): raise TypeError("Bottle keys must be strings")
+        print('BottleBucket setitem key: %s, value: %s' % (key, value))
+        if not isinstance(key, str):
+            raise TypeError("Bottle keys must be strings")
         self.mmap[key] = value
-    
+
     def __delitem__(self, key):
+        print('BottleBucket delitem key: %s' % key)
         if key in self.mmap:
             del self.mmap[key]
         del self.db[key]
 
     def __getattr__(self, key):
-        try: return self[key]
-        except KeyError: raise AttributeError(key)
+        print('BottleBucket getattr key: %s' % key)
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def __setattr__(self, key, value):
+        print('BottleBucket setattr key: %s, value: %s' % (key, value))
         self[key] = value
 
     def __delattr__(self, key):
-        try: del self[key]
-        except KeyError: raise AttributeError(key)
+        print('BottleBucket delattr key: %s' % key)
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def __iter__(self):
         return iter(self.ukeys())
-    
+
     def __contains__(self, key):
         return key in self.ukeys()
-  
+
     def __len__(self):
         return len(self.ukeys())
 
@@ -1057,7 +1112,7 @@ class BottleBucket(object): # pragma: no cover
     def save(self):
         self.close()
         self.__init__(self.name)
-    
+
     def close(self):
         for key in self.mmap:
             pvalue = pickle.dumps(self.mmap[key], pickle.HIGHEST_PROTOCOL)
@@ -1068,12 +1123,12 @@ class BottleBucket(object): # pragma: no cover
             self.db.sync()
         if hasattr(self.db, 'close'):
             self.db.close()
-        
+
     def clear(self):
         for key in self.db:
             del self.db[key]
         self.mmap.clear()
-        
+
     def update(self, other):
         self.mmap.update(other)
 
@@ -1086,18 +1141,18 @@ class BottleBucket(object): # pragma: no cover
             raise
 
 
-class BottleDB(threading.local): # pragma: no cover
-    """ Holds multible BottleBucket instances in a thread-local way. """
+class BottleDB(threading.local):
     def __init__(self):
         self.__dict__['open'] = {}
-        
+
     def __getitem__(self, key):
-        warnings.warn("Please do not use bottle.db anymore. This feature is deprecated. You may use anydb directly.", DeprecationWarning)
+        print('BottleDB getitem key: %s' % key)
         if key not in self.open and not key.startswith('_'):
             self.open[key] = BottleBucket(key)
         return self.open[key]
 
     def __setitem__(self, key, value):
+        print('BottleDB setitem key: %s, value: %s' % (key, value))
         if isinstance(value, BottleBucket):
             self.open[key] = value
         elif hasattr(value, 'items'):
@@ -1110,34 +1165,38 @@ class BottleDB(threading.local): # pragma: no cover
             raise ValueError("Only dicts and BottleBuckets are allowed.")
 
     def __delitem__(self, key):
+        print('BottleDB delitem key: %s' % key)
         if key not in self.open:
             self.open[key].clear()
             self.open[key].save()
             del self.open[key]
 
     def __getattr__(self, key):
-        try: return self[key]
-        except KeyError: raise AttributeError(key)
+        print('BottleDB getattr key: %s' % key)
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def __setattr__(self, key, value):
+        print('BottleDB setattr key: %s, value: %s' % (key, value))
         self[key] = value
 
     def __delattr__(self, key):
-        try: del self[key]
-        except KeyError: raise AttributeError(key)
+        print('BottleDB delattr key: %s' % key)
+        try:
+            del self[key]
+        except KeyError:
+            raise AttributeError(key)
 
     def save(self):
         self.close()
         self.__init__()
-    
+
     def close(self):
         for db in self.open:
             self.open[db].close()
         self.open.clear()
-
-
-
-
 
 
 # Modul initialization and configuration
@@ -1226,5 +1285,4 @@ def debug(mode=True):
 
 def optimize(mode=True):
     default_app().optimize = bool(mode)
-
 

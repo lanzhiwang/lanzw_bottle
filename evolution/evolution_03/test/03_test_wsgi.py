@@ -52,7 +52,8 @@ class TestWsgi(WsgiTestBase):
     def test_get(self):
         """ WSGI: GET routes"""
         @bottle.route('/')
-        def test(): return 'test'
+        def test():
+            return 'test'
         self.assertEqual(404, self.urlopen('/not/found').code)
         self.assertEqual(404, self.urlopen('/', post="var=value").code)
         self.assertEqual('test', self.urlopen('/').read())
@@ -60,7 +61,8 @@ class TestWsgi(WsgiTestBase):
     def test_post(self):
         """ WSGI: POST routes"""
         @bottle.route('/', method='POST')
-        def test(): return 'test'
+        def test():
+            return 'test'
         self.assertEqual(404, self.urlopen('/not/found').code)
         self.assertEqual(404, self.urlopen('/').code)
         self.assertEqual('test', self.urlopen('/', post="var=value").read())
@@ -68,9 +70,11 @@ class TestWsgi(WsgiTestBase):
     def test_headget(self):
         """ WSGI: HEAD routes and GET fallback"""
         @bottle.route('/get')
-        def test(): return 'test'
+        def test():
+            return 'test'
         @bottle.route('/head', method='HEAD')
-        def test2(): return 'test'
+        def test2():
+            return 'test'
         # GET -> HEAD
         self.assertEqual(404, self.urlopen('/head').code)
         # HEAD -> HEAD
@@ -83,16 +87,17 @@ class TestWsgi(WsgiTestBase):
     def test_500(self):
         """ WSGI: Exceptions within handler code (HTTP 500) """
         @bottle.route('/')
-        def test(): return 1/0
+        def test():
+            return 1/0
         self.assertEqual(500, self.urlopen('/').code)
         bottle.default_app().catchall = False
         self.assertRaises(ZeroDivisionError, self.urlopen, '/')
-        
 
     def test_503(self):
         """ WSGI: Server stopped (HTTP 503) """
         @bottle.route('/')
-        def test(): return 'bla'
+        def test():
+            return 'bla'
         self.assertEqual(200, self.urlopen('/').code)
         bottle.default_app().serve = False
         self.assertEqual(503, self.urlopen('/').code)
@@ -100,12 +105,15 @@ class TestWsgi(WsgiTestBase):
     def test_default(self):
         """ WSGI: default routes """
         @bottle.route('/')
-        def test2(): return 'test'
+        def test2():
+            return 'test'
         self.assertEqual(404, self.urlopen('/not/found').code)
         self.assertEqual(200, self.urlopen('/').code)
         self.assertEqual('test', self.urlopen('/').read())
+
         @bottle.default()
-        def test(): return 'default'
+        def test():
+            return 'default'
         self.assertEqual(200, self.urlopen('/not/found').code)
         self.assertEqual('default', self.urlopen('/not/found').read())
         self.assertEqual(200, self.urlopen('/').code)
@@ -114,8 +122,10 @@ class TestWsgi(WsgiTestBase):
     def test_401(self):
         """ WSGI: abort(401, '') (HTTP 401) """
         @bottle.route('/')
-        def test(): bottle.abort(401)
+        def test():
+            bottle.abort(401)
         self.assertEqual(401, self.urlopen('/').code)
+
         @bottle.error(401)
         def err(e):
             bottle.response.status = 200
@@ -126,53 +136,72 @@ class TestWsgi(WsgiTestBase):
     def test_307(self):
         """ WSGI: redirect (HTTP 307) """
         @bottle.route('/')
-        def test(): bottle.redirect('/yes')
+        def test():
+            bottle.redirect('/yes')
+
         @bottle.route('/yes')
-        def test2(): return 'yes'
+        def test2():
+            return 'yes'
+
         self.assertEqual(200, self.urlopen('/').code)
         self.assertEqual('yes', self.urlopen('/').read())
 
     def test_interrupt(self):
         """ WSGI: Server stopped (HTTP 503) """
         @bottle.route('/')
-        def test(): raise KeyboardInterrupt()
+        def test():
+            raise KeyboardInterrupt()
         self.assertRaises(KeyboardInterrupt, self.urlopen, '/')
 
     def test_casting(self):
         """ WSGI: Output Casting (strings an lists) """
         @bottle.route('/str')
-        def test(): return 'test'
+        def test():
+            return 'test'
         self.assertEqual('test', self.urlopen('/str').read())
+
         @bottle.route('/list')
-        def test2(): return ['t','e','st']
+        def test2():
+            return ['t','e','st']
         self.assertEqual('test', self.urlopen('/list').read())
+
         @bottle.route('/empty')
-        def test3(): return []
+        def test3():
+            return []
         self.assertEqual('', self.urlopen('/empty').read())
+
         @bottle.route('/none')
-        def test4(): return None
+        def test4():
+            return None
         self.assertEqual('', self.urlopen('/none').read())
+
         @bottle.route('/bad')
-        def test5(): return 12345
+        def test5():
+            return 12345
         self.assertEqual(500, self.urlopen('/bad').code)
 
     def test_file(self):
         """ WSGI: Output Casting (files) """
         @bottle.route('/file')
-        def test(): return StringIO('test')
+        def test():
+            return StringIO('test')
         self.assertEqual('test', self.urlopen('/file').read())
-
 
     def test_unicode(self):
         """ WSGI: Test Unicode support """
         @bottle.route('/unicode')
-        def test3(): return u'äöüß'
+        def test3():
+            return u'äöüß'
+
         @bottle.route('/unicode2')
-        def test4(): return [u'äöüß']
+        def test4():
+            return [u'äöüß']
+
         @bottle.route('/unicode3')
         def test5():
             bottle.response.content_type='text/html; charset=iso-8859-15'
-            return u'äöüß'  
+            return u'äöüß'
+
         self.assertEqual(u'äöüß'.encode('utf8'), self.urlopen('/unicode').read())
         self.assertEqual(u'äöüß'.encode('utf8'), self.urlopen('/unicode2').read())
         self.assertEqual(u'äöüß'.encode('iso-8859-15'), self.urlopen('/unicode3').read())
@@ -180,7 +209,8 @@ class TestWsgi(WsgiTestBase):
     def test_json(self):
         """ WSGI: Autojson feature """
         @bottle.route('/json')
-        def test(): return {'a': 1}
+        def test():
+            return {'a': 1}
         self.assertEqual(r'{"a":1}', ''.join(self.urlopen('/json').read().split()))
         self.assertEqual('application/json', self.urlopen('/json').info().getheader('Content-Type',''))
 
@@ -211,7 +241,7 @@ class TestDecorators(WsgiTestBase):
         result='+base+\n+main+\n!1234!\n+include+\n-main-\n+include+\n-base-\n'
         self.assertEqual('text/html', self.urlopen('/tpl').info().getheader('Content-Type',''))
         self.assertEqual(result, self.urlopen('/tpl').read())
-    
+
     def test_validate(self):
         """ WSGI: Test validate-decorator"""
         @bottle.route('/:var')
@@ -238,7 +268,6 @@ class TestRun(WsgiTestBase):
                 self.assertEqual('test', urllib2.urlopen('http://127.0.0.1:61382/test').read())
             finally:
                 thread.interrupt_main()
-        
         thread.start_new_thread(paratest, ())
         bottle.run(port=61382, quiet=True)
 
