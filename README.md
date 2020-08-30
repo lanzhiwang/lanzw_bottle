@@ -35,6 +35,6 @@ lanzw.py 文件汇总了整个框架的功能。
 
 https://github.com/bottlepy/bottle/commits/master?after=357a0cb39cb8337f8467f5396e4b7caaa7e4f25c+839&path%5B%5D=bottle.py
 
-Use StringIO instead of tempfile for small POST requests.
+Reusable Router classes and speedup for dynamic routes.
 
 git checkout -b evolution_02 444443ce1d863dbb91e141891f7f514865dcae61
